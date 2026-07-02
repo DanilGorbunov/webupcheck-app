@@ -62,7 +62,7 @@ export function SiteDetailPage({ site, onBack }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12.5, color: '#6B7280' }}>
             <span>{flag} {country}</span>
             <span style={{ color: '#D1D5DB' }}>·</span>
-            <span>{site.languages.map(l => l.toUpperCase()).join(', ')}</span>
+            <span>{(site.languages ?? []).map((l: string) => l.toUpperCase()).join(', ')}</span>
             <span style={{ color: '#D1D5DB' }}>·</span>
             <span>{site.formatType}</span>
             <span style={{ color: '#D1D5DB' }}>·</span>
@@ -77,7 +77,7 @@ export function SiteDetailPage({ site, onBack }: Props) {
           >
             {checking ? 'Checking…' : 'Re-check Now'}
           </button>
-          {site.urlExamples[0] && (
+          {(site.urlExamples ?? [])[0] && (
             <a href={site.urlExamples[0]} target="_blank" rel="noopener noreferrer" style={{ padding: '7px 12px', background: 'white', color: '#374151', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
               View Example →
             </a>
@@ -127,11 +127,11 @@ export function SiteDetailPage({ site, onBack }: Props) {
           <MetricCard title="Time on Site" value={site.timeOnSite != null ? `${site.timeOnSite.toFixed(0)}s` : '—'} sub="avg session" ok={(site.timeOnSite ?? 0) > 30} />
           <MetricCard title="MAI Score" value={site.mai != null ? String(site.mai) : '—'} sub="Medialister Attention Index" ok={(site.mai ?? 0) >= 30} />
 
-          {site.leadingCountries && Object.keys(site.leadingCountries).length > 0 && (
+          {Array.isArray(site.leadingCountries) && site.leadingCountries.length > 0 && (
             <>
               <div style={{ gridColumn: '1/-1', fontSize: 10.5, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid #F1F5F9', paddingBottom: 5, marginTop: 6 }}>Top Countries</div>
-              {Object.entries(site.leadingCountries).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => (
-                <MetricCard key={c} title={`${countryFlag(c)} ${c}`} value={v.toLocaleString()} sub="visitors/mo" ok />
+              {[...(site.leadingCountries as [string, number][])].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, v]) => (
+                <MetricCard key={c} title={`${countryFlag(c)} ${c}`} value={Number(v).toLocaleString()} sub="visitors/mo" ok />
               ))}
             </>
           )}
