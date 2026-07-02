@@ -24,7 +24,7 @@ export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
 
-  const { syncing, syncProgress, syncTotal, totalItems, error } = useMedialister()
+  const { syncing, syncProgress, syncTotal, totalItems } = useMedialister()
   const { healthChecked, healthTotal, healthRunning } = useHealthChecker()
 
   const alertCount = (useQuery(listAlertsFn, { dismissed: false }) ?? []).length
