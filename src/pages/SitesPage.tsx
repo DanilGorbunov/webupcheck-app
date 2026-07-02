@@ -188,7 +188,7 @@ export function SitesPage({ totalItems, onViewSite }: Props) {
                     {flag} {country !== '—' ? country.slice(0, 2).toUpperCase() : '—'}
                   </td>
                   <td style={{ padding: '10px 16px', fontSize: 12, color: '#6B7280', fontWeight: 500 }}>
-                    {site.languages.join(', ').toUpperCase()}
+                    {(site.languages ?? []).join(', ').toUpperCase()}
                   </td>
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: site.dr ? (site.dr >= 70 ? '#16A34A' : site.dr >= 40 ? '#D97706' : '#DC2626') : '#9CA3AF' }}>
@@ -199,7 +199,7 @@ export function SitesPage({ totalItems, onViewSite }: Props) {
                     {formatTraffic(site.organicTraffic)}
                   </td>
                   <td style={{ padding: '10px 16px', fontSize: 12.5, fontWeight: 600, color: '#0F172A' }}>
-                    ${site.price.toFixed(0)}
+                    ${(site.price ?? 0).toFixed(0)}
                   </td>
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{ fontSize: 11, color: '#6B7280', background: '#F1F5F9', padding: '2px 7px', borderRadius: 4, fontWeight: 500 }}>{site.formatType}</span>
