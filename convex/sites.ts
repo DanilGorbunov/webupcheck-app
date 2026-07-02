@@ -39,8 +39,8 @@ export const stats = query({
     const unknown = all.filter(s => s.status === 'Unknown').length
     const checked = total - unknown
     const withDr50 = all.filter(s => (s.dr ?? 0) >= 50).length
-    const avgPrice = total ? Math.round(all.reduce((a, b) => a + b.price, 0) / total) : 0
-    const languages = new Set(all.flatMap(s => s.languages)).size
+    const avgPrice = total ? Math.round(all.reduce((a, b) => a + (b.price ?? 0), 0) / total) : 0
+    const languages = new Set(all.flatMap(s => s.languages ?? [])).size
     const lastChecked = all.reduce((max, s) => Math.max(max, s.lastCheckedAt ?? 0), 0)
     return { total, active, warning, unreachable, parked, blacklisted, needsReview, issues, unknown, checked, withDr50, avgPrice, languages, lastChecked }
   },
