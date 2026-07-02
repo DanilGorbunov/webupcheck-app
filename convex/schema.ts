@@ -27,6 +27,9 @@ export default defineSchema({
     metaDescription: v.optional(v.string()),
     isParked: v.optional(v.boolean()),
     responseTimeMs: v.optional(v.number()),
+    // Retry / failure tracking
+    consecutiveFailures: v.optional(v.number()),
+    lastSuccessAt: v.optional(v.number()),
     // Sync
     medialistSyncedAt: v.optional(v.number()),
   })

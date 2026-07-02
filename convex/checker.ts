@@ -2,45 +2,55 @@ import { action, internalAction } from './_generated/server'
 import { v } from 'convex/values'
 import { api } from './_generated/api'
 
-// Level 1 — confirmed parking: explicit domain-for-sale / parking pages
-const CONFIRMED_PARKING = [
-  'this domain is for sale',
+// Explicit parking keywords — immediate confirm regardless of word count
+const EXPLICIT_PARKING = [
+  'domain for sale',
   'buy this domain',
+  'this domain is for sale',
   'domain is for sale',
   'parkingcrew.net',
   'hugedomains.com',
-  'domain parking',
   'undeveloped.com',
   'afternic.com',
   'sedo.com/search',
   'dan.com/buy',
-  'this domain has been registered',
-  'domain has expired',
+  'domain parking',
   'godaddy.com/domainfind',
 ]
 
-// Level 2 — suspicious: empty WordPress default, coming soon, maintenance
-const SUSPICIOUS_PATTERNS = [
-  'coming soon',
-  'under construction',
-  'maintenance mode',
-  'website coming soon',
-  'launching soon',
-  'site is under maintenance',
-  'just another wordpress site',
-]
-
-function isSuspiciousTitle(title: string, domain: string): boolean {
+// Level 1: title check — ONLY "Home - SiteName" default WordPress pattern
+// Returns true only when the title strongly suggests an empty WordPress install.
+// A real site title like "Investing.com — Markets" must NOT match.
+function hasSuspiciousTitle(title: string): boolean {
   if (!title) return false
-  const t = title.toLowerCase().trim()
-  const d = domain.toLowerCase().replace(/^www\./, '')
-  // "Home - SiteName" is default WordPress empty site title
-  if (/^home\s*[-–|·]\s*.+$/.test(t)) return true
-  // Domain itself as the title — no real content
-  if (t === d || t === `www.${d}` || t === domain.toLowerCase()) return true
-  // WordPress default subtitle
-  if (t.includes('just another wordpress')) return true
-  return false
+  const t = title.trim()
+  // "Home - Anything" or "Home – Anything" → default empty WordPress
+  return /^home\s*[-–|]\s*.{1,80}$/i.test(t)
+}
+
+// Level 2: body confirmation — called only when Level 1 passes.
+// Returns true only when ALL content signals say the site is empty.
+function confirmedEmptyByBody(html: string, wordCount: number): boolean {
+  // Real content → not parking
+  if (wordCount >= 300) return false
+
+  // Has article/post markup → real blog content
+  if (/<article[\s>]/i.test(html)) return false
+  if (/class=["'][^"']*\bpost\b[^"']*["']/i.test(html)) return false
+
+  // Has timestamps / dates → real posts
+  if (/<time[\s>]/i.test(html)) return false
+  if (/\bdatetime=/i.test(html)) return false
+  if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b/i.test(html)) return false
+  if (/\b20\d{2}-\d{2}-\d{2}\b/.test(html)) return false
+
+  // Has meaningful navigation (≥3 links in <nav>) → real site
+  const navBlock = html.match(/<nav[\s\S]*?<\/nav>/i)?.[0] ?? ''
+  const navLinkCount = (navBlock.match(/<a\s/gi) ?? []).length
+  if (navLinkCount >= 3) return false
+
+  // All signals say empty — confirmed parking/empty
+  return true
 }
 
 async function fetchSite(domain: string): Promise<{
@@ -49,7 +59,6 @@ async function fetchSite(domain: string): Promise<{
   pageTitle?: string
   metaDescription?: string
   isParked: boolean
-  isSuspicious: boolean
   responseTimeMs: number
 }> {
   const url = `https://${domain}`
@@ -70,7 +79,7 @@ async function fetchSite(domain: string): Promise<{
     const redirectUrl = finalUrl && finalUrl !== url && !finalUrl.startsWith(url + '/') ? finalUrl : undefined
 
     let html = ''
-    try { html = await res.text() } catch { /* ignore */ }
+    try { html = await res.text() } catch { /* ignore body read errors */ }
 
     const titleMatch = html.match(/<title[^>]*>([^<]{0,200})<\/title>/i)
     const pageTitle = titleMatch?.[1]?.trim().replace(/\s+/g, ' ')
@@ -79,18 +88,17 @@ async function fetchSite(domain: string): Promise<{
       ?? html.match(/<meta[^>]+content=["']([^"']{0,500})["'][^>]+name=["']description["']/i)
     const metaDescription = descMatch?.[1]?.trim()
 
-    const textToCheck = `${pageTitle ?? ''} ${html.slice(0, 5000)}`.toLowerCase()
+    const textToCheck = `${pageTitle ?? ''} ${html.slice(0, 8000)}`.toLowerCase()
     const wordCount = html.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length
 
-    // Confirmed parking: explicit for-sale / parking page
-    const isParked = CONFIRMED_PARKING.some(kw => textToCheck.includes(kw)) && wordCount < 300
+    // Explicit parking keywords → confirmed immediately
+    const hasExplicitParking = EXPLICIT_PARKING.some(kw => textToCheck.includes(kw))
 
-    // Suspicious: empty WordPress, coming soon, etc.
-    const hasSuspiciousBody = SUSPICIOUS_PATTERNS.some(p => textToCheck.includes(p)) && wordCount < 500
-    const hasSuspiciousTitle = isSuspiciousTitle(pageTitle ?? '', domain)
-    const isSuspicious = !isParked && (hasSuspiciousBody || hasSuspiciousTitle) && wordCount < 500
+    // Two-level: title suspicion → body confirmation
+    const titleSuspicious = hasSuspiciousTitle(pageTitle ?? '')
+    const isParked = hasExplicitParking || (titleSuspicious && confirmedEmptyByBody(html, wordCount))
 
-    return { httpStatus: res.status, redirectUrl, pageTitle, metaDescription, isParked, isSuspicious, responseTimeMs }
+    return { httpStatus: res.status, redirectUrl, pageTitle, metaDescription, isParked, responseTimeMs }
   } catch {
     // HTTP fallback
     try {
@@ -101,9 +109,9 @@ async function fetchSite(domain: string): Promise<{
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WebUpCheck/1.0)' },
       })
       const responseTimeMs = Date.now() - start
-      return { httpStatus: res2.status, isParked: false, isSuspicious: false, responseTimeMs }
+      return { httpStatus: res2.status, isParked: false, responseTimeMs }
     } catch {
-      return { httpStatus: 0, isParked: false, isSuspicious: false, responseTimeMs: Date.now() - start }
+      return { httpStatus: 0, isParked: false, responseTimeMs: Date.now() - start }
     }
   }
 }
@@ -137,8 +145,9 @@ export const checkBatch = internalAction({
         return { domain, ...result }
       })
     )
-    const done = results.filter(r => r.status === 'fulfilled').length
-    const failed = results.filter(r => r.status === 'rejected').length
-    return { done, failed }
+    return {
+      done: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+    }
   },
 })

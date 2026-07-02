@@ -41,18 +41,18 @@ export function AlertsPage({ onViewSite }: Props) {
 
   const allAlerts: DbAlert[] = tab === 'dismissed' ? dismissedAlerts : activeAlerts
 
-  // Dead = confirmed server down: HTTP 0, 502, 503, 504, or confirmed parking page
-  const DEAD_PATTERNS = ['HTTP 0)', 'HTTP 502', 'HTTP 503', 'HTTP 504', 'server down', 'parking page detected']
-  // Exclude false positives that are actually alive
-  const NOT_DEAD = ['HTTP 403', 'HTTP 429', 'HTTP 406', 'HTTP 404', 'redirects to', 'bot protection', 'needs review']
+  // Dead = confirmed: HTTP 0 / DNS, confirmed parking, or 3+ consecutive 5xx failures
+  const isDead = (a: DbAlert): boolean => {
+    const msg = (a.message ?? '').toLowerCase()
+    if (msg.includes('http 0)') || msg.includes('(http 0)')) return true           // no response
+    if (msg.includes('parking page detected')) return true                          // confirmed parking
+    if (/\d+ consecutive checks failed/.test(msg)) return true                     // 3rd 5xx fail
+    return false
+  }
 
   const filtered = allAlerts.filter((a: DbAlert) => {
     if (tab === 'critical') return a.severity === 'critical'
-    if (tab === 'dead') {
-      const msg = (a.message ?? '').toLowerCase()
-      return DEAD_PATTERNS.some(p => msg.includes(p.toLowerCase()))
-        && !NOT_DEAD.some(p => msg.includes(p.toLowerCase()))
-    }
+    if (tab === 'dead') return isDead(a)
     return true
   })
 

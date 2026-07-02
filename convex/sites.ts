@@ -92,7 +92,6 @@ export const saveCheckResult = mutation({
     pageTitle: v.optional(v.string()),
     metaDescription: v.optional(v.string()),
     isParked: v.optional(v.boolean()),
-    isSuspicious: v.optional(v.boolean()),
     responseTimeMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -100,7 +99,17 @@ export const saveCheckResult = mutation({
     if (!site) return
 
     const statusBefore = site.status
-    const newStatus = deriveStatus(args)
+    const prevFailures = site.consecutiveFailures ?? 0
+
+    // Derive status using pre-check failure count
+    const newStatus = deriveStatus({ ...args, consecutiveFailures: prevFailures })
+
+    // Update consecutive failure counter
+    const http = args.httpStatus ?? 0
+    const is5xx = http >= 500
+    const is2xx = http >= 200 && http < 300
+    const newFailures = is5xx ? prevFailures + 1 : is2xx ? 0 : prevFailures
+    const lastSuccessAt = is2xx ? Date.now() : site.lastSuccessAt
 
     await ctx.db.patch(args.siteId, {
       httpStatus: args.httpStatus,
@@ -111,6 +120,8 @@ export const saveCheckResult = mutation({
       responseTimeMs: args.responseTimeMs,
       status: newStatus,
       lastCheckedAt: Date.now(),
+      consecutiveFailures: newFailures,
+      lastSuccessAt,
     })
 
     await ctx.db.insert('checkHistory', {
@@ -127,22 +138,21 @@ export const saveCheckResult = mutation({
       statusAfter: newStatus,
     })
 
-    const ALERT_STATUSES = ['Unreachable', 'Parked', 'Blacklisted', 'Suspended', 'Warning', 'NeedsReview']
+    const ALERT_STATUSES = ['Unreachable', 'Parked', 'Blacklisted', 'Suspended', 'Warning']
     const changed = statusBefore !== newStatus
     if (!changed || !ALERT_STATUSES.includes(newStatus)) return
 
     const severity = (newStatus === 'Unreachable' || newStatus === 'Parked') ? 'critical' : 'warning'
-    const http = args.httpStatus ?? 0
-    const message = newStatus === 'Unreachable'
+    const message = newStatus === 'Unreachable' && is5xx
+      ? `Server down — ${newFailures} consecutive checks failed (HTTP ${http})`
+      : newStatus === 'Unreachable'
       ? `Site is unreachable (HTTP ${http})`
       : newStatus === 'Parked'
       ? `Parking page detected — title: "${args.pageTitle ?? ''}"`
-      : newStatus === 'NeedsReview'
-      ? `Needs review — ${args.isSuspicious ? `suspicious title: "${args.pageTitle ?? ''}"` : `HTTP ${http}`}`
       : newStatus === 'Warning' && args.redirectUrl
       ? `Redirects to ${args.redirectUrl}`
       : newStatus === 'Warning'
-      ? `Bot protection / access restricted (HTTP ${http})`
+      ? `Bot protection / rate limit (HTTP ${http})`
       : `Status changed: ${statusBefore} → ${newStatus}`
 
     // Subdomain grouping: group N subdomains of same root into one alert
@@ -307,19 +317,21 @@ export const siteHistory = query({
   },
 })
 
+// consecutiveFailures = failures recorded BEFORE this check
 function deriveStatus(r: {
   httpStatus?: number
   isParked?: boolean
-  isSuspicious?: boolean
-  redirectUrl?: string
+  consecutiveFailures?: number
 }): string {
   if (!r.httpStatus || r.httpStatus === 0) return 'Unreachable'
   if (r.isParked) return 'Parked'
-  if (r.httpStatus === 502 || r.httpStatus === 503 || r.httpStatus === 504) return 'Unreachable'
-  if (r.httpStatus === 404 || r.httpStatus >= 500) return 'Unreachable'
+  if (r.httpStatus === 404) return 'Unreachable'
+  // 5xx retry logic: Warning until 3rd consecutive failure → Unreachable
+  if (r.httpStatus >= 500) {
+    return (r.consecutiveFailures ?? 0) >= 2 ? 'Unreachable' : 'Warning'
+  }
   if (r.httpStatus === 403 || r.httpStatus === 429 || r.httpStatus === 406) return 'Warning'
   if (r.httpStatus === 301 || r.httpStatus === 302) return 'Warning'
-  if (r.isSuspicious) return 'NeedsReview'
   if (r.httpStatus >= 200 && r.httpStatus < 300) return 'Active'
   return 'Unknown'
 }
