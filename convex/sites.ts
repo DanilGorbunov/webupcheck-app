@@ -40,7 +40,7 @@ export const stats = query({
         take('Parked', 2000),
         take('Blacklisted', 500),
         take('NeedsReview', 500),
-        take('Active', 2000),
+        take('Active', 8000),
       ])
 
     const active      = activeRows.length
