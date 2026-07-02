@@ -285,11 +285,30 @@ export const upsertBatch = mutation({
     for (const site of sites) {
       try {
         const existing = await ctx.db.query('sites').withIndex('by_domain', q => q.eq('domain', site.domain)).first()
-        const clean = Object.fromEntries(Object.entries(site).filter(([, val]) => val !== undefined && val !== null))
+        const optional = {
+          ...(site.dr !== undefined && { dr: site.dr }),
+          ...(site.organicTraffic !== undefined && { organicTraffic: site.organicTraffic }),
+          ...(site.audience !== undefined && { audience: site.audience }),
+          ...(site.bounceRate !== undefined && { bounceRate: site.bounceRate }),
+          ...(site.timeOnSite !== undefined && { timeOnSite: site.timeOnSite }),
+          ...(site.mai !== undefined && { mai: site.mai }),
+          ...(site.semrushAuthorityScore !== undefined && { semrushAuthorityScore: site.semrushAuthorityScore }),
+          ...(site.leadingCountries !== undefined && { leadingCountries: site.leadingCountries }),
+        }
         if (existing) {
-          await ctx.db.patch(existing._id, { ...clean, medialistSyncedAt: Date.now() })
+          await ctx.db.patch(existing._id, {
+            medialisterId: site.medialisterId, domain: site.domain,
+            languages: site.languages, formatType: site.formatType,
+            price: site.price, urlExamples: site.urlExamples,
+            ...optional, medialistSyncedAt: Date.now(),
+          })
         } else {
-          await ctx.db.insert('sites', { ...clean, status: 'Unknown', medialistSyncedAt: Date.now() })
+          await ctx.db.insert('sites', {
+            medialisterId: site.medialisterId, domain: site.domain,
+            languages: site.languages, formatType: site.formatType,
+            price: site.price, urlExamples: site.urlExamples,
+            ...optional, status: 'Unknown', medialistSyncedAt: Date.now(),
+          })
         }
       } catch {
         errors++
