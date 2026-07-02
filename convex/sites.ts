@@ -215,11 +215,15 @@ export const completeSyncLog = mutation({
 export const getActiveSyncLog = query({
   args: {},
   handler: async (ctx) => {
-    const logs = await ctx.db.query('syncLog')
-      .filter(q => q.eq(q.field('type'), 'medialister_sync'))
-      .order('desc')
-      .take(1)
-    return logs[0] ?? null
+    try {
+      const logs = await ctx.db.query('syncLog')
+        .filter(q => q.eq(q.field('type'), 'medialister_sync'))
+        .order('desc')
+        .take(1)
+      return logs[0] ?? null
+    } catch {
+      return null
+    }
   }
 })
 
