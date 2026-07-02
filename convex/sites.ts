@@ -28,8 +28,20 @@ export const getByDomain = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const cnt = async (status: string) =>
-      (await ctx.db.query('sites').withIndex('by_status', q => q.eq('status', status)).take(16384)).length
+    // Paginate through each status bucket to count without hitting doc limits
+    const cnt = async (status: string): Promise<number> => {
+      let total = 0
+      let cursor: string | null = null
+      while (true) {
+        const page = await ctx.db.query('sites')
+          .withIndex('by_status', q => q.eq('status', status))
+          .paginate({ numItems: 1000, cursor })
+        total += page.page.length
+        if (page.isDone) break
+        cursor = page.continueCursor
+      }
+      return total
+    }
 
     const active      = await cnt('Active')
     const warning     = await cnt('Warning')
@@ -39,8 +51,8 @@ export const stats = query({
     const needsReview = await cnt('NeedsReview')
     const unknown     = await cnt('Unknown')
 
-    const total   = active + warning + unreachable + parked + blacklisted + needsReview + unknown
-    const issues  = unreachable + parked + blacklisted
+    const total  = active + warning + unreachable + parked + blacklisted + needsReview + unknown
+    const issues = unreachable + parked + blacklisted
     const checked = total - unknown
     return { total, active, warning, unreachable, parked, blacklisted, needsReview, issues, unknown, checked, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
   },
