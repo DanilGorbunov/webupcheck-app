@@ -30,7 +30,7 @@ const upsertBatchFn = makeFunctionReference<'mutation', {
     timeOnSite?: number; mai?: number; semrushAuthorityScore?: number;
     leadingCountries?: unknown; urlExamples: string[];
   }>
-}, void>('sites:upsertBatch')
+}, number>('sites:upsertBatch')
 
 const startSyncLogFn = makeFunctionReference<'mutation', { totalItems: number; totalPages: number }, string>('sites:startSyncLog')
 const updateSyncLogFn = makeFunctionReference<'mutation', { logId: string; processed: number; totalPages: number }, void>('sites:updateSyncLog')
@@ -75,22 +75,17 @@ export function useMedialister() {
         logId = await startSyncLog({ totalItems: total, totalPages })
 
         const batch = first['hydra:member'].map(offerToSite)
-        await upsertBatch({ sites: batch.map(s => ({
-          medialisterId: s.id,
-          domain: s.domain,
-          languages: s.languages,
-          formatType: s.formatType,
-          price: s.price,
-          dr: s.dr,
-          organicTraffic: s.organicTraffic,
-          audience: s.audience,
-          bounceRate: s.bounceRate,
-          timeOnSite: s.timeOnSite,
-          mai: s.mai,
-          semrushAuthorityScore: s.semrushAuthorityScore,
-          leadingCountries: safeCountries(s.leadingCountries),
-          urlExamples: s.urlExamples,
-        })) })
+        try {
+          await upsertBatch({ sites: batch.map(s => ({
+            medialisterId: s.id, domain: s.domain, languages: s.languages,
+            formatType: s.formatType, price: s.price, dr: s.dr,
+            organicTraffic: s.organicTraffic, audience: s.audience,
+            bounceRate: s.bounceRate, timeOnSite: s.timeOnSite, mai: s.mai,
+            semrushAuthorityScore: s.semrushAuthorityScore,
+            leadingCountries: safeCountries(s.leadingCountries),
+            urlExamples: s.urlExamples,
+          })) })
+        } catch { /* skip failed batch, continue sync */ }
         await updateSyncLog({ logId, processed: 1, totalPages })
       } else {
         setTotalItems(knownTotal)
@@ -104,22 +99,17 @@ export function useMedialister() {
         const data = await fetchOffersPage(page, 100)
         const batch = data['hydra:member'].map(offerToSite)
 
-        await upsertBatch({ sites: batch.map(s => ({
-          medialisterId: s.id,
-          domain: s.domain,
-          languages: s.languages,
-          formatType: s.formatType,
-          price: s.price,
-          dr: s.dr,
-          organicTraffic: s.organicTraffic,
-          audience: s.audience,
-          bounceRate: s.bounceRate,
-          timeOnSite: s.timeOnSite,
-          mai: s.mai,
-          semrushAuthorityScore: s.semrushAuthorityScore,
-          leadingCountries: safeCountries(s.leadingCountries),
-          urlExamples: s.urlExamples,
-        })) })
+        try {
+          await upsertBatch({ sites: batch.map(s => ({
+            medialisterId: s.id, domain: s.domain, languages: s.languages,
+            formatType: s.formatType, price: s.price, dr: s.dr,
+            organicTraffic: s.organicTraffic, audience: s.audience,
+            bounceRate: s.bounceRate, timeOnSite: s.timeOnSite, mai: s.mai,
+            semrushAuthorityScore: s.semrushAuthorityScore,
+            leadingCountries: safeCountries(s.leadingCountries),
+            urlExamples: s.urlExamples,
+          })) })
+        } catch { /* skip failed batch, continue sync */ }
 
         if (logId) {
           await updateSyncLog({ logId, processed: page, totalPages })
