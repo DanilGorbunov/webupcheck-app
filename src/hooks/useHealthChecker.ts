@@ -14,7 +14,7 @@ const listNeedingCheckFn = makeFunctionReference<'query', { limit?: number }, Ar
 
 const checkOneSiteFn = makeFunctionReference<'action', { domain: string; siteId: ConvexId }, unknown>('checker:checkOneSite')
 
-const CONCURRENT = 3
+const CONCURRENT = 20
 
 export function useHealthChecker() {
   const sites = useQuery(listNeedingCheckFn, { limit: 100 })

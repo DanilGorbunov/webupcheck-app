@@ -121,13 +121,15 @@ export const saveCheckResult = mutation({
       statusAfter: newStatus,
     })
 
-    // Create alert if status changed negatively
-    if (statusBefore !== 'Unknown' && statusBefore !== newStatus) {
-      const severity = ['Unreachable', 'Blacklisted'].includes(newStatus) ? 'critical'
-        : newStatus === 'Parked' ? 'critical'
-        : 'warning'
+    // Create alert on first check if bad, or on negative status change
+    const BAD = ['Unreachable', 'Parked', 'Blacklisted', 'Suspended']
+    const isBad = BAD.includes(newStatus)
+    const changed = statusBefore !== newStatus
+    if (changed && isBad) {
+      const severity = ['Unreachable', 'Blacklisted', 'Parked', 'Suspended'].includes(newStatus) ? 'critical' : 'warning'
       const message = newStatus === 'Unreachable' ? `Site is unreachable (HTTP ${args.httpStatus ?? 0})`
         : newStatus === 'Parked' ? `Parking page detected — title: "${args.pageTitle}"`
+        : newStatus === 'Suspended' ? `Domain suspended (HTTP ${args.httpStatus ?? 0})`
         : newStatus === 'Warning' && args.redirectUrl ? `Redirects to ${args.redirectUrl}`
         : `Status changed: ${statusBefore} → ${newStatus}`
 
@@ -237,7 +239,10 @@ export const listPaginated = query({
 export const listNeedingCheck = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, { limit = 100 }) => {
+    // Prioritize high DR sites first using by_dr index
     return ctx.db.query('sites')
+      .withIndex('by_dr')
+      .order('desc')
       .filter(q => q.eq(q.field('status'), 'Unknown'))
       .take(limit)
   }
