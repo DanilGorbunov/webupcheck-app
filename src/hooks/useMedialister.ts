@@ -1,58 +1,51 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useQuery, useMutation } from 'convex/react'
+import { makeFunctionReference } from 'convex/server'
 import { fetchOffersPage, offerToSite } from '../lib/medialister'
-import type { Site } from '../types'
 
-const CACHE_KEY = 'wuc_sites'
-const CACHE_META_KEY = 'wuc_meta'
-const CACHE_TTL = 1000 * 60 * 60 * 6 // 6h
+type SyncLogId = string
 
-interface CacheMeta {
-  totalItems: number
-  totalPages: number
-  lastSavedPage: number // how many pages we've saved so far
-  fetchedAt: number
-}
+const getActiveSyncLog = makeFunctionReference<'query', Record<string, never>, {
+  _id: SyncLogId
+  type: string
+  startedAt: number
+  completedAt?: number
+  totalItems?: number
+  processed?: number
+  status: string
+  message?: string
+} | null>('sites:getActiveSyncLog')
 
-function loadMeta(): CacheMeta | null {
-  try {
-    const raw = localStorage.getItem(CACHE_META_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
-}
+const upsertBatchFn = makeFunctionReference<'mutation', {
+  sites: Array<{
+    medialisterId: string; domain: string; languages: string[]; formatType: string; price: number;
+    dr?: number; organicTraffic?: number; audience?: number; bounceRate?: number;
+    timeOnSite?: number; mai?: number; semrushAuthorityScore?: number;
+    leadingCountries?: unknown; urlExamples: string[];
+  }>
+}, void>('sites:upsertBatch')
 
-function saveMeta(meta: CacheMeta) {
-  try { localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta)) } catch { /* quota */ }
-}
+const startSyncLogFn = makeFunctionReference<'mutation', { totalItems: number; totalPages: number }, string>('sites:startSyncLog')
+const updateSyncLogFn = makeFunctionReference<'mutation', { logId: string; processed: number; totalPages: number }, void>('sites:updateSyncLog')
+const completeSyncLogFn = makeFunctionReference<'mutation', { logId: string }, void>('sites:completeSyncLog')
 
-function savePage(pageIndex: number, sites: Site[]) {
-  try { localStorage.setItem(`${CACHE_KEY}_${pageIndex}`, JSON.stringify(sites)) } catch { /* quota */ }
-}
-
-function loadAllPages(totalPages: number): Site[] {
-  const all: Site[] = []
-  for (let i = 0; i < totalPages; i++) {
-    try {
-      const raw = localStorage.getItem(`${CACHE_KEY}_${i}`)
-      if (raw) all.push(...JSON.parse(raw))
-    } catch { /* skip */ }
-  }
-  return all
-}
-
-function isCacheStale(meta: CacheMeta): boolean {
-  return Date.now() - meta.fetchedAt > CACHE_TTL
-}
+const SYNC_TTL = 1000 * 60 * 60 * 6 // 6h
 
 export function useMedialister() {
-  const [sites, setSites] = useState<Site[]>([])
-  const [totalItems, setTotalItems] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const syncLog = useQuery(getActiveSyncLog, {})
+  const upsertBatch = useMutation(upsertBatchFn)
+  const startSyncLog = useMutation(startSyncLogFn)
+  const updateSyncLog = useMutation(updateSyncLogFn)
+  const completeSyncLog = useMutation(completeSyncLogFn)
+
   const [syncing, setSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState(0)
   const [syncTotal, setSyncTotal] = useState(0)
+  const [totalItems, setTotalItems] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   const abortRef = useRef(false)
+  const startedRef = useRef(false)
 
   const syncAll = useCallback(async (resumeFrom = 1, knownTotal = 0, knownPages = 0) => {
     abortRef.current = false
@@ -62,8 +55,8 @@ export function useMedialister() {
     try {
       let totalPages = knownPages
       let total = knownTotal
+      let logId: string
 
-      // If starting fresh, fetch page 1 to get totals
       if (resumeFrom === 1) {
         const first = await fetchOffersPage(1, 100)
         total = first['hydra:totalItems']
@@ -72,15 +65,33 @@ export function useMedialister() {
         setSyncTotal(totalPages)
         setSyncProgress(1)
 
+        logId = await startSyncLog({ totalItems: total, totalPages })
+
         const batch = first['hydra:member'].map(offerToSite)
-        savePage(0, batch)
-        saveMeta({ totalItems: total, totalPages, lastSavedPage: 1, fetchedAt: Date.now() })
-        setSites(loadAllPages(totalPages))
+        await upsertBatch({ sites: batch.map(s => ({
+          medialisterId: s.id,
+          domain: s.domain,
+          languages: s.languages,
+          formatType: s.formatType,
+          price: s.price,
+          dr: s.dr,
+          organicTraffic: s.organicTraffic,
+          audience: s.audience,
+          bounceRate: s.bounceRate,
+          timeOnSite: s.timeOnSite,
+          mai: s.mai,
+          semrushAuthorityScore: s.semrushAuthorityScore,
+          leadingCountries: s.leadingCountries,
+          urlExamples: s.urlExamples,
+        })) })
+        await updateSyncLog({ logId, processed: 1, totalPages })
       } else {
-        // Resuming — totals already known
-        setTotalItems(total)
-        setSyncTotal(totalPages)
+        setTotalItems(knownTotal)
+        setSyncTotal(knownPages)
         setSyncProgress(resumeFrom)
+        // We need a valid logId — it will be the currently running one
+        // We'll get it from the syncLog query value captured via closure
+        logId = '' // will be overwritten below
       }
 
       for (let page = resumeFrom === 1 ? 2 : resumeFrom; page <= totalPages; page++) {
@@ -88,60 +99,84 @@ export function useMedialister() {
         const data = await fetchOffersPage(page, 100)
         const batch = data['hydra:member'].map(offerToSite)
 
-        // Save this page immediately — survives reload
-        savePage(page - 1, batch)
-        saveMeta({ totalItems: total, totalPages, lastSavedPage: page, fetchedAt: Date.now() })
+        await upsertBatch({ sites: batch.map(s => ({
+          medialisterId: s.id,
+          domain: s.domain,
+          languages: s.languages,
+          formatType: s.formatType,
+          price: s.price,
+          dr: s.dr,
+          organicTraffic: s.organicTraffic,
+          audience: s.audience,
+          bounceRate: s.bounceRate,
+          timeOnSite: s.timeOnSite,
+          mai: s.mai,
+          semrushAuthorityScore: s.semrushAuthorityScore,
+          leadingCountries: s.leadingCountries,
+          urlExamples: s.urlExamples,
+        })) })
+
+        if (logId) {
+          await updateSyncLog({ logId, processed: page, totalPages })
+        }
 
         setSyncProgress(page)
-        setSites(loadAllPages(totalPages))
-
         await new Promise(r => setTimeout(r, 50))
       }
 
+      if (logId!) {
+        await completeSyncLog({ logId })
+      }
+
       setSyncing(false)
-      setLoading(false)
     } catch (err) {
       setSyncing(false)
-      setLoading(false)
       setError(String(err))
     }
-  }, [])
+  }, [upsertBatch, startSyncLog, updateSyncLog, completeSyncLog])
+
+  // Decide what to do once syncLog is loaded from DB
+  useEffect(() => {
+    if (syncLog === undefined) return // still loading
+    if (startedRef.current) return   // already acted
+    startedRef.current = true
+
+    if (!syncLog) {
+      // No sync log at all — start fresh
+      syncAll()
+      return
+    }
+
+    const isStale = Date.now() - syncLog.startedAt > SYNC_TTL
+
+    if (syncLog.status === 'completed' && !isStale) {
+      // Fresh completed sync — nothing to do
+      setTotalItems(syncLog.totalItems ?? 0)
+      setSyncTotal(0)
+      setSyncProgress(0)
+      setSyncing(false)
+      return
+    }
+
+    if (syncLog.status === 'running') {
+      // Resume from where we left off
+      const processed = syncLog.processed ?? 0
+      const total = syncLog.totalItems ?? 0
+      const pages = total > 0 ? Math.ceil(total / 100) : 0
+      setTotalItems(total)
+      setSyncTotal(pages)
+      setSyncProgress(processed)
+      syncAll(processed + 1, total, pages)
+      return
+    }
+
+    // Stale or failed — start fresh
+    syncAll()
+  }, [syncLog, syncAll])
 
   useEffect(() => {
-    const meta = loadMeta()
-
-    if (!meta) {
-      // No cache at all — start fresh
-      syncAll()
-      return
-    }
-
-    if (isCacheStale(meta)) {
-      // Cache expired — clear and restart
-      for (let i = 0; i < meta.totalPages; i++) localStorage.removeItem(`${CACHE_KEY}_${i}`)
-      localStorage.removeItem(CACHE_META_KEY)
-      syncAll()
-      return
-    }
-
-    // Load whatever pages we have
-    const cached = loadAllPages(meta.lastSavedPage)
-    setSites(cached)
-    setTotalItems(meta.totalItems)
-    setSyncTotal(meta.totalPages)
-    setSyncProgress(meta.lastSavedPage)
-
-    if (meta.lastSavedPage >= meta.totalPages) {
-      // Fully synced — done
-      setLoading(false)
-    } else {
-      // Partially synced — resume from where we stopped
-      setLoading(false)
-      syncAll(meta.lastSavedPage + 1, meta.totalItems, meta.totalPages)
-    }
-
     return () => { abortRef.current = true }
-  }, [syncAll])
+  }, [])
 
-  return { sites, totalItems, loading, syncing, syncProgress, syncTotal, error, syncAll }
+  return { syncing, syncProgress, syncTotal, totalItems, error }
 }

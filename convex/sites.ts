@@ -1,5 +1,6 @@
 import { query, mutation } from './_generated/server'
 import { v } from 'convex/values'
+import { paginationOptsValidator } from 'convex/server'
 
 export const list = query({
   args: {
@@ -157,6 +158,84 @@ export const listAlerts = query({
       .order('desc')
       .take(100)
   },
+})
+
+export const upsertBatch = mutation({
+  args: {
+    sites: v.array(v.object({
+      medialisterId: v.string(), domain: v.string(),
+      languages: v.array(v.string()), formatType: v.string(), price: v.number(),
+      dr: v.optional(v.number()), organicTraffic: v.optional(v.number()),
+      audience: v.optional(v.number()), bounceRate: v.optional(v.number()),
+      timeOnSite: v.optional(v.number()), mai: v.optional(v.number()),
+      semrushAuthorityScore: v.optional(v.number()),
+      leadingCountries: v.optional(v.any()), urlExamples: v.array(v.string()),
+    }))
+  },
+  handler: async (ctx, { sites }) => {
+    for (const site of sites) {
+      const existing = await ctx.db.query('sites').withIndex('by_domain', q => q.eq('domain', site.domain)).first()
+      if (existing) {
+        await ctx.db.patch(existing._id, { ...site, medialistSyncedAt: Date.now() })
+      } else {
+        await ctx.db.insert('sites', { ...site, status: 'Unknown', medialistSyncedAt: Date.now() })
+      }
+    }
+  }
+})
+
+export const startSyncLog = mutation({
+  args: { totalItems: v.number(), totalPages: v.number() },
+  handler: async (ctx, args) => {
+    const running = await ctx.db.query('syncLog').withIndex('by_type', q => q.eq('type', 'medialister_sync'))
+      .filter(q => q.eq(q.field('status'), 'running')).collect()
+    for (const log of running) await ctx.db.patch(log._id, { status: 'failed', message: 'interrupted' })
+    return ctx.db.insert('syncLog', {
+      type: 'medialister_sync', startedAt: Date.now(), totalItems: args.totalItems,
+      processed: 0, status: 'running', message: `0/${args.totalPages} pages`
+    })
+  }
+})
+
+export const updateSyncLog = mutation({
+  args: { logId: v.id('syncLog'), processed: v.number(), totalPages: v.number() },
+  handler: async (ctx, { logId, processed, totalPages }) => {
+    await ctx.db.patch(logId, { processed, message: `${processed}/${totalPages} pages` })
+  }
+})
+
+export const completeSyncLog = mutation({
+  args: { logId: v.id('syncLog') },
+  handler: async (ctx, { logId }) => {
+    await ctx.db.patch(logId, { status: 'completed', completedAt: Date.now() })
+  }
+})
+
+export const getActiveSyncLog = query({
+  args: {},
+  handler: async (ctx) => {
+    return ctx.db.query('syncLog').withIndex('by_type', q => q.eq('type', 'medialister_sync'))
+      .order('desc').first()
+  }
+})
+
+export const listPaginated = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { paginationOpts }) => {
+    return ctx.db.query('sites').order('desc').paginate(paginationOpts)
+  }
+})
+
+export const listNeedingCheck = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit = 100 }) => {
+    const cutoff = Date.now() - 1000 * 60 * 60 * 24 // 24h
+    const unknown = await ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Unknown')).take(limit)
+    if (unknown.length >= limit) return unknown
+    const stale = await ctx.db.query('sites').withIndex('by_last_checked', q => q.lt('lastCheckedAt', cutoff))
+      .take(limit - unknown.length)
+    return [...unknown, ...stale]
+  }
 })
 
 export const siteHistory = query({

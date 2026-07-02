@@ -1,18 +1,19 @@
 import { useState } from 'react'
-import type { Site } from '../types'
+import { useQuery, useMutation } from 'convex/react'
+import { makeFunctionReference } from 'convex/server'
 
-interface Alert {
-  id: string
-  domain: string
-  severity: 'critical' | 'warning' | 'info'
-  message: string
-  time: string
-  dismissed: boolean
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DbSite = any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DbAlert = any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ConvexId = any
+
+const listAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, DbAlert[]>('sites:listAlerts')
+const dismissAlertFn = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
 
 interface Props {
-  sites: Site[]
-  onViewSite: (s: Site) => void
+  onViewSite: (s: DbSite) => void
 }
 
 const SEVERITY_STYLES = {
@@ -23,51 +24,29 @@ const SEVERITY_STYLES = {
 
 const ICONS = { critical: '🔴', warning: '⚠️', info: 'ℹ️' }
 
-export function AlertsPage({ sites, onViewSite }: Props) {
+function formatRelTime(ts: number): string {
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+export function AlertsPage({ onViewSite }: Props) {
   const [tab, setTab] = useState<'all' | 'unresolved' | 'critical' | 'dismissed'>('all')
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
+  const activeAlerts = useQuery(listAlertsFn, { dismissed: false }) ?? []
+  const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true }) ?? []
+  const dismissAlert = useMutation(dismissAlertFn)
 
-  const generated: Alert[] = sites
-    .filter(s => s.status && !['Active', 'Unknown'].includes(s.status))
-    .slice(0, 50)
-    .map(s => {
-      const sev: Alert['severity'] =
-        s.status === 'Unreachable' || s.status === 'Blacklisted' ? 'critical'
-        : s.status === 'Warning' ? 'warning' : 'info'
-      const msgs: Record<string, string> = {
-        Unreachable: 'Site returned no response for 2+ consecutive checks',
-        Blacklisted: 'Domain added to spam/malware blocklist',
-        Parked: 'Parking page detected — content has been removed',
-        Suspended: 'Domain registrar account flagged or suspended',
-        Warning: 'Site health degraded — check required',
-      }
-      return {
-        id: String(s.id),
-        domain: s.domain,
-        severity: sev,
-        message: msgs[s.status ?? ''] ?? 'Status changed',
-        time: '2h ago',
-        dismissed: dismissedIds.has(String(s.id)),
-      }
-    })
+  const allAlerts: DbAlert[] = tab === 'dismissed' ? dismissedAlerts : activeAlerts
 
-  const filtered = generated.filter(a => {
-    if (tab === 'dismissed') return a.dismissed
-    if (a.dismissed) return false
+  const filtered = allAlerts.filter((a: DbAlert) => {
     if (tab === 'critical') return a.severity === 'critical'
-    if (tab === 'unresolved') return !a.dismissed
     return true
   })
 
-  const undismissedCount = generated.filter(a => !a.dismissed).length
-
-  function dismiss(id: string) {
-    setDismissedIds(prev => new Set([...prev, id]))
-  }
-
-  function dismissAll() {
-    setDismissedIds(new Set(generated.map(a => a.id)))
-  }
+  const undismissedCount = activeAlerts.length
 
   const TAB_STYLE = (t: typeof tab) => ({
     padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer',
@@ -86,11 +65,6 @@ export function AlertsPage({ sites, onViewSite }: Props) {
             {undismissedCount > 0 ? `${undismissedCount} active alerts across your network` : 'No active alerts'}
           </p>
         </div>
-        {undismissedCount > 0 && (
-          <button onClick={dismissAll} style={{ padding: '7px 14px', background: 'white', color: '#374151', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Mark all read
-          </button>
-        )}
       </div>
 
       {/* Tabs */}
@@ -117,12 +91,12 @@ export function AlertsPage({ sites, onViewSite }: Props) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {filtered.map(alert => {
-            const st = SEVERITY_STYLES[alert.severity]
-            const site = sites.find(s => s.domain === alert.domain)
+          {filtered.map((alert: DbAlert) => {
+            const sev = (alert.severity ?? 'info') as keyof typeof SEVERITY_STYLES
+            const st = SEVERITY_STYLES[sev] ?? SEVERITY_STYLES.info
             return (
-              <div key={alert.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderLeft: `3px solid ${st.border}`, background: st.bg, borderRadius: '0 8px 8px 0', opacity: alert.dismissed ? 0.6 : 1 }}>
-                <span style={{ fontSize: 18, flexShrink: 0, width: 26, textAlign: 'center' }}>{ICONS[alert.severity]}</span>
+              <div key={alert._id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderLeft: `3px solid ${st.border}`, background: st.bg, borderRadius: '0 8px 8px 0', opacity: alert.dismissed ? 0.6 : 1 }}>
+                <span style={{ fontSize: 18, flexShrink: 0, width: 26, textAlign: 'center' }}>{ICONS[sev] ?? 'ℹ️'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{alert.domain}</span>
@@ -130,15 +104,19 @@ export function AlertsPage({ sites, onViewSite }: Props) {
                   </div>
                   <div style={{ fontSize: 12.5, color: '#374151' }}>{alert.message}</div>
                 </div>
-                <span style={{ fontSize: 11.5, color: '#94A3B8', whiteSpace: 'nowrap', flexShrink: 0 }}>{alert.time}</span>
+                <span style={{ fontSize: 11.5, color: '#94A3B8', whiteSpace: 'nowrap', flexShrink: 0 }}>{formatRelTime(alert.createdAt)}</span>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  {site && (
-                    <button onClick={() => onViewSite(site)} style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: '#374151', cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                      View Site
-                    </button>
-                  )}
+                  <button
+                    onClick={() => onViewSite({ _id: alert.siteId, domain: alert.domain })}
+                    style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: '#374151', cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}
+                  >
+                    View Site
+                  </button>
                   {!alert.dismissed && (
-                    <button onClick={() => dismiss(alert.id)} style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <button
+                      onClick={() => dismissAlert({ alertId: alert._id })}
+                      style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
                       Dismiss
                     </button>
                   )}

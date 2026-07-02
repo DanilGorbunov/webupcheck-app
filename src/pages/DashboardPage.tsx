@@ -1,12 +1,23 @@
-import type { Site } from '../types'
+import { useQuery } from 'convex/react'
+import { makeFunctionReference } from 'convex/server'
+import type { Page } from '../App'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DbSite = any
+
+const statsFn = makeFunctionReference<'query', Record<string, never>, {
+  total: number; active: number; warning: number; issues: number; unknown: number;
+  withDr50: number; avgPrice: number; languages: number; lastChecked: number;
+}>('sites:stats')
+
+const listFn = makeFunctionReference<'query', { status?: string; limit?: number }, DbSite[]>('sites:list')
 
 interface Props {
-  sites: Site[]
   totalItems: number
   syncing: boolean
   syncProgress: number
   syncTotal: number
-  onNav: (page: 'sites' | 'checker' | 'alerts') => void
+  onNav: (page: Page) => void
 }
 
 function StatCard({ label, value, sub, subColor, icon, iconBg }: { label: string; value: string; sub: string; subColor: string; icon: React.ReactNode; iconBg: string }) {
@@ -24,24 +35,29 @@ function StatCard({ label, value, sub, subColor, icon, iconBg }: { label: string
   )
 }
 
-export function DashboardPage({ sites, totalItems, syncing, syncProgress, syncTotal, onNav }: Props) {
-  const active = sites.filter(s => s.status === 'Active').length
-  const issues = sites.filter(s => ['Unreachable', 'Blacklisted', 'Suspended', 'Parked'].includes(s.status ?? '')).length
-  const warnings = sites.filter(s => s.status === 'Warning').length
-  const parked = sites.filter(s => s.status === 'Parked').length
-  const blacklisted = sites.filter(s => s.status === 'Blacklisted').length
-  const unreachable = sites.filter(s => s.status === 'Unreachable').length
-  const total = sites.length || totalItems
+export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, onNav }: Props) {
+  const stats = useQuery(statsFn, {})
+  const recentIssueSites = useQuery(listFn, { limit: 6 })
+  const topSites = useQuery(listFn, { limit: 50 })
+
+  const active = stats?.active ?? 0
+  const issues = stats?.issues ?? 0
+  const warnings = stats?.warning ?? 0
+  const total = stats?.total || totalItems
+
+  const parked = (recentIssueSites ?? []).filter((s: DbSite) => s.status === 'Parked').length
+  const blacklisted = (recentIssueSites ?? []).filter((s: DbSite) => s.status === 'Blacklisted').length
+  const unreachable = (recentIssueSites ?? []).filter((s: DbSite) => s.status === 'Unreachable').length
 
   const activeRate = total > 0 ? ((active / total) * 100).toFixed(1) : '—'
 
-  const recentIssues = sites
-    .filter(s => s.status && !['Active', 'Unknown'].includes(s.status))
+  const recentIssues = (recentIssueSites ?? [])
+    .filter((s: DbSite) => s.status && !['Active', 'Unknown'].includes(s.status))
     .slice(0, 6)
 
-  const topSites = [...sites]
-    .filter(s => s.dr != null)
-    .sort((a, b) => (b.dr ?? 0) - (a.dr ?? 0))
+  const sortedTopSites = [...(topSites ?? [])]
+    .filter((s: DbSite) => s.dr != null)
+    .sort((a: DbSite, b: DbSite) => (b.dr ?? 0) - (a.dr ?? 0))
     .slice(0, 6)
 
   const statusIssueRows = [
@@ -82,7 +98,7 @@ export function DashboardPage({ sites, totalItems, syncing, syncProgress, syncTo
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
         <StatCard
           label="Total Sites"
-          value={(sites.length || totalItems).toLocaleString()}
+          value={total.toLocaleString()}
           sub={syncing ? `Syncing ${syncPct}%…` : `${totalItems.toLocaleString()} in Medialister`}
           subColor={syncing ? '#2563EB' : '#16A34A'}
           iconBg="#EFF6FF"
@@ -91,7 +107,7 @@ export function DashboardPage({ sites, totalItems, syncing, syncProgress, syncTo
         <StatCard
           label="Active"
           value={active.toLocaleString()}
-          sub={sites.length > 0 ? `${activeRate}% of checked` : 'Awaiting checks'}
+          sub={total > 0 ? `${activeRate}% of checked` : 'Awaiting checks'}
           subColor="#16A34A"
           iconBg="#F0FDF4"
           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
@@ -151,7 +167,7 @@ export function DashboardPage({ sites, totalItems, syncing, syncProgress, syncTo
               🎉 All sites are healthy
             </div>
           ) : (
-            recentIssues.map(site => {
+            recentIssues.map((site: DbSite) => {
               const statusColors: Record<string, { bg: string; color: string }> = {
                 Warning: { bg: '#FFFBEB', color: '#D97706' },
                 Unreachable: { bg: '#FEF2F2', color: '#DC2626' },
@@ -161,7 +177,7 @@ export function DashboardPage({ sites, totalItems, syncing, syncProgress, syncTo
               }
               const sc = statusColors[site.status ?? ''] ?? { bg: '#F1F5F9', color: '#94A3B8' }
               return (
-                <div key={site.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #F1F5F9' }}>
+                <div key={site._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #F1F5F9' }}>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: sc.color, flexShrink: 0 }} />
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{site.domain}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: sc.bg, color: sc.color, flexShrink: 0 }}>{site.status}</span>
@@ -179,7 +195,7 @@ export function DashboardPage({ sites, totalItems, syncing, syncProgress, syncTo
           <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0F172A' }}>Top Sites by Domain Rating</div>
           <button onClick={() => onNav('sites')} style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>View all sites →</button>
         </div>
-        {topSites.length === 0 ? (
+        {sortedTopSites.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>Loading sites data…</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -191,11 +207,11 @@ export function DashboardPage({ sites, totalItems, syncing, syncProgress, syncTo
               </tr>
             </thead>
             <tbody>
-              {topSites.map(site => {
+              {sortedTopSites.map((site: DbSite) => {
                 const traffic = site.organicTraffic
                 const trafficStr = !traffic ? '—' : traffic >= 1_000_000 ? `${(traffic / 1_000_000).toFixed(1)}M` : traffic >= 1_000 ? `${(traffic / 1_000).toFixed(0)}K` : String(traffic)
                 return (
-                  <tr key={site.id} style={{ borderTop: '1px solid #F1F5F9' }}>
+                  <tr key={site._id} style={{ borderTop: '1px solid #F1F5F9' }}>
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ width: 20, height: 20, background: '#EFF6FF', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

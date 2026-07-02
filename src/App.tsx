@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useQuery } from 'convex/react'
+import { makeFunctionReference } from 'convex/server'
 import { Sidebar } from './components/layout/Sidebar'
-import { SyncProgress } from './components/ui/SyncProgress'
 import { SitesPage } from './pages/SitesPage'
 import { SiteDetailPage } from './pages/SiteDetailPage'
 import { CheckerPage } from './pages/CheckerPage'
@@ -13,6 +14,9 @@ import { useMedialister } from './hooks/useMedialister'
 import { useHealthChecker } from './hooks/useHealthChecker'
 import type { Site } from './types'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const listAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, Array<any>>('sites:listAlerts')
+
 export type Page = 'dashboard' | 'sites' | 'checker' | 'alerts' | 'campaigns' | 'settings'
 type AppView = 'landing' | 'app'
 
@@ -21,10 +25,11 @@ export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
 
-  const { sites, totalItems, loading, syncing, syncProgress, syncTotal, error } = useMedialister()
-  const { sitesWithStatus, healthChecked, healthTotal, healthRunning } = useHealthChecker(sites)
+  const { syncing, syncProgress, syncTotal, totalItems, error } = useMedialister()
+  const { healthChecked, healthTotal, healthRunning } = useHealthChecker()
 
-  const alertCount = sitesWithStatus.filter(s => s.status && !['Active', 'Unknown'].includes(s.status)).length
+  const alerts = useQuery(listAlertsFn, { dismissed: false })
+  const alertCount = alerts?.length ?? 0
 
   if (view === 'landing') {
     return (
@@ -40,16 +45,16 @@ export default function App() {
       return <SiteDetailPage site={selectedSite} onBack={() => setSelectedSite(null)} />
     }
     if (page === 'sites') {
-      return <SitesPage sites={sitesWithStatus} totalItems={totalItems} syncing={syncing} onViewSite={s => setSelectedSite(s)} />
+      return <SitesPage totalItems={totalItems} syncing={syncing} onViewSite={s => setSelectedSite(s)} />
     }
     if (page === 'dashboard') {
-      return <DashboardPage sites={sitesWithStatus} totalItems={totalItems} syncing={syncing} syncProgress={syncProgress} syncTotal={syncTotal} onNav={p => { setPage(p); setSelectedSite(null) }} />
+      return <DashboardPage totalItems={totalItems} syncing={syncing} syncProgress={syncProgress} syncTotal={syncTotal} onNav={p => { setPage(p); setSelectedSite(null) }} />
     }
     if (page === 'checker') {
       return <CheckerPage />
     }
     if (page === 'alerts') {
-      return <AlertsPage sites={sitesWithStatus} onViewSite={s => setSelectedSite(s)} />
+      return <AlertsPage onViewSite={s => setSelectedSite(s)} />
     }
     if (page === 'campaigns') {
       return <CampaignsPage />
@@ -75,17 +80,11 @@ export default function App() {
       />
 
       <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
-        {loading && sites.length === 0 && !error && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8', fontSize: 14 }}>
-            Loading sites…
-          </div>
-        )}
         {error && (
           <div style={{ padding: 28, color: '#DC2626', fontSize: 13 }}>Error: {error}</div>
         )}
-        {sites.length > 0 && renderContent()}
+        {renderContent()}
       </div>
-
     </div>
   )
 }
