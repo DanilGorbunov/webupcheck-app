@@ -10,6 +10,7 @@ import { AlertsPage } from './pages/AlertsPage'
 import { CampaignsPage } from './pages/CampaignsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { useMedialister } from './hooks/useMedialister'
+import { useHealthChecker } from './hooks/useHealthChecker'
 import type { Site } from './types'
 
 export type Page = 'dashboard' | 'sites' | 'checker' | 'alerts' | 'campaigns' | 'settings'
@@ -21,6 +22,7 @@ export default function App() {
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
 
   const { sites, totalItems, loading, syncing, syncProgress, syncTotal, error } = useMedialister()
+  const { sitesWithStatus, healthChecked, healthTotal, healthRunning } = useHealthChecker(sites)
 
   if (view === 'landing') {
     return (
@@ -36,16 +38,16 @@ export default function App() {
       return <SiteDetailPage site={selectedSite} onBack={() => setSelectedSite(null)} />
     }
     if (page === 'sites') {
-      return <SitesPage sites={sites} totalItems={totalItems} syncing={syncing} onViewSite={s => setSelectedSite(s)} />
+      return <SitesPage sites={sitesWithStatus} totalItems={totalItems} syncing={syncing} onViewSite={s => setSelectedSite(s)} />
     }
     if (page === 'dashboard') {
-      return <DashboardPage sites={sites} totalItems={totalItems} syncing={syncing} syncProgress={syncProgress} syncTotal={syncTotal} onNav={p => { setPage(p); setSelectedSite(null) }} />
+      return <DashboardPage sites={sitesWithStatus} totalItems={totalItems} syncing={syncing} syncProgress={syncProgress} syncTotal={syncTotal} onNav={p => { setPage(p); setSelectedSite(null) }} />
     }
     if (page === 'checker') {
       return <CheckerPage />
     }
     if (page === 'alerts') {
-      return <AlertsPage sites={sites} onViewSite={s => setSelectedSite(s)} />
+      return <AlertsPage sites={sitesWithStatus} onViewSite={s => setSelectedSite(s)} />
     }
     if (page === 'campaigns') {
       return <CampaignsPage />
@@ -72,7 +74,14 @@ export default function App() {
         {sites.length > 0 && renderContent()}
       </div>
 
-      {syncing && <SyncProgress progress={syncProgress} total={syncTotal} />}
+      <SyncProgress
+        syncing={syncing}
+        syncProgress={syncProgress}
+        syncTotal={syncTotal}
+        healthChecked={healthChecked}
+        healthTotal={healthTotal}
+        healthRunning={healthRunning}
+      />
     </div>
   )
 }
