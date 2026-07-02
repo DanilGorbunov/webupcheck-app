@@ -268,9 +268,9 @@ export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, on
   const blacklisted = stats?.blacklisted ?? 0
   const needsReview = stats?.needsReview ?? 0
   const issues = stats?.issues ?? 0
-  const unknown = stats?.unknown ?? 0
-  const total = stats?.total || totalItems
   const checked = stats?.checked ?? 0
+  const total = totalItems || checked
+  const unknown = Math.max(0, total - checked)
 
   const syncPct = syncTotal > 0 ? Math.round((syncProgress / syncTotal) * 100) : 100
 

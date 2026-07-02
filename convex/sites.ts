@@ -28,33 +28,30 @@ export const getByDomain = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    // Paginate through each status bucket to count without hitting doc limits
-    const cnt = async (status: string): Promise<number> => {
-      let total = 0
-      let cursor: string | null = null
-      while (true) {
-        const page = await ctx.db.query('sites')
-          .withIndex('by_status', q => q.eq('status', status))
-          .paginate({ numItems: 1000, cursor })
-        total += page.page.length
-        if (page.isDone) break
-        cursor = page.continueCursor
-      }
-      return total
-    }
+    // Only count small-ish statuses to stay under Convex's 8192 doc/query limit.
+    // Unknown can be 100k+, so we skip it here — frontend computes: unknown = totalItems - checked
+    const take = (s: string, n: number) =>
+      ctx.db.query('sites').withIndex('by_status', q => q.eq('status', s)).take(n)
 
-    const active      = await cnt('Active')
-    const warning     = await cnt('Warning')
-    const unreachable = await cnt('Unreachable')
-    const parked      = await cnt('Parked')
-    const blacklisted = await cnt('Blacklisted')
-    const needsReview = await cnt('NeedsReview')
-    const unknown     = await cnt('Unknown')
+    const [warningRows, unreachableRows, parkedRows, blacklistedRows, needsReviewRows, activeRows] =
+      await Promise.all([
+        take('Warning', 2000),
+        take('Unreachable', 2000),
+        take('Parked', 2000),
+        take('Blacklisted', 500),
+        take('NeedsReview', 500),
+        take('Active', 2000),
+      ])
 
-    const total  = active + warning + unreachable + parked + blacklisted + needsReview + unknown
-    const issues = unreachable + parked + blacklisted
-    const checked = total - unknown
-    return { total, active, warning, unreachable, parked, blacklisted, needsReview, issues, unknown, checked, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
+    const active      = activeRows.length
+    const warning     = warningRows.length
+    const unreachable = unreachableRows.length
+    const parked      = parkedRows.length
+    const blacklisted = blacklistedRows.length
+    const needsReview = needsReviewRows.length
+    const checked     = active + warning + unreachable + parked + blacklisted + needsReview
+    const issues      = unreachable + parked + blacklisted
+    return { active, warning, unreachable, parked, blacklisted, needsReview, checked, issues, total: 0, unknown: 0, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
   },
 })
 
