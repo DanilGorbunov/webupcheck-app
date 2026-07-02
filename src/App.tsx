@@ -24,6 +24,8 @@ export default function App() {
   const { sites, totalItems, loading, syncing, syncProgress, syncTotal, error } = useMedialister()
   const { sitesWithStatus, healthChecked, healthTotal, healthRunning } = useHealthChecker(sites)
 
+  const alertCount = sitesWithStatus.filter(s => s.status && !['Active', 'Unknown'].includes(s.status)).length
+
   if (view === 'landing') {
     return (
       <LandingPage
@@ -69,6 +71,7 @@ export default function App() {
         healthRunning={healthRunning}
         healthChecked={healthChecked}
         healthTotal={healthTotal}
+        alertCount={alertCount}
       />
 
       <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>

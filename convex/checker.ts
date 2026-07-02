@@ -9,6 +9,7 @@ const PARKED_KEYWORDS = [
   'this domain is parked', 'domain is parked',
 ]
 
+// Direct fetch — no CORS proxy needed since this runs server-side in Convex
 async function fetchSite(domain: string): Promise<{
   httpStatus: number
   redirectUrl?: string
@@ -21,19 +22,22 @@ async function fetchSite(domain: string): Promise<{
   const start = Date.now()
 
   try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) })
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; WebUpCheck/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+      },
+    })
     const responseTimeMs = Date.now() - start
+    const finalUrl = res.url
+    const redirectUrl = finalUrl && finalUrl !== url && !finalUrl.startsWith(url + '/') ? finalUrl : undefined
 
-    if (!res.ok) {
-      return { httpStatus: res.status, isParked: false, responseTimeMs }
-    }
-
-    const data = await res.json()
-    const html: string = data.contents ?? ''
-    const httpStatus: number = data.status?.http_code ?? 200
-    const finalUrl: string = data.status?.url ?? url
-    const redirectUrl = finalUrl !== url ? finalUrl : undefined
+    let html = ''
+    try {
+      html = await res.text()
+    } catch { /* ignore body read errors */ }
 
     const titleMatch = html.match(/<title[^>]*>([^<]{0,200})<\/title>/i)
     const pageTitle = titleMatch?.[1]?.trim().replace(/\s+/g, ' ')
@@ -45,11 +49,31 @@ async function fetchSite(domain: string): Promise<{
     const textToCheck = `${pageTitle ?? ''} ${html.slice(0, 5000)}`.toLowerCase()
     const isParked = PARKED_KEYWORDS.some(kw => textToCheck.includes(kw))
 
-    return { httpStatus, redirectUrl, pageTitle, metaDescription, isParked, responseTimeMs }
+    return { httpStatus: res.status, redirectUrl, pageTitle, metaDescription, isParked, responseTimeMs }
   } catch {
-    return { httpStatus: 0, isParked: false, responseTimeMs: Date.now() - start }
+    // Try HTTP fallback if HTTPS fails
+    try {
+      const httpUrl = `http://${domain}`
+      const res2 = await fetch(httpUrl, {
+        signal: AbortSignal.timeout(10000),
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WebUpCheck/1.0)' },
+      })
+      const responseTimeMs = Date.now() - start
+      return { httpStatus: res2.status, isParked: false, responseTimeMs }
+    } catch {
+      return { httpStatus: 0, isParked: false, responseTimeMs: Date.now() - start }
+    }
   }
 }
+
+// Check a domain without saving to DB — for use by the health checker hook
+export const checkDomain = action({
+  args: { domain: v.string() },
+  handler: async (_ctx, { domain }) => {
+    return await fetchSite(domain)
+  },
+})
 
 export const checkOneSite = action({
   args: { domain: v.string(), siteId: v.id('sites') },

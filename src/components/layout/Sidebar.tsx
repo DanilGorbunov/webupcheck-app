@@ -11,6 +11,7 @@ interface Props {
   healthRunning?: boolean
   healthChecked?: number
   healthTotal?: number
+  alertCount?: number
 }
 
 const navItems: { id: Page; label: string; icon: ReactNode }[] = [
@@ -46,12 +47,12 @@ const navItems: { id: Page; label: string; icon: ReactNode }[] = [
   },
 ]
 
-export function Sidebar({ current, onNav, stats, syncing, syncProgress = 0, syncTotal = 0, healthRunning, healthChecked = 0, healthTotal = 0 }: Props) {
+export function Sidebar({ current, onNav, stats, syncing, syncProgress = 0, syncTotal = 0, healthRunning, healthChecked = 0, healthTotal = 0, alertCount = 0 }: Props) {
   const syncPct = syncTotal ? Math.round((syncProgress / syncTotal) * 100) : 0
   const healthPct = healthTotal ? Math.round((healthChecked / healthTotal) * 100) : 0
 
   return (
-    <div style={{ width: 232, minWidth: 232, background: '#0F172A', display: 'flex', flexDirection: 'column', height: '100vh', zIndex: 10 }}>
+    <div style={{ width: 264, minWidth: 264, background: '#0F172A', display: 'flex', flexDirection: 'column', height: '100vh', zIndex: 10 }}>
       {/* Logo */}
       <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -69,6 +70,7 @@ export function Sidebar({ current, onNav, stats, syncing, syncProgress = 0, sync
       <nav style={{ padding: '10px 8px', flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
         {navItems.map(item => {
           const active = current === item.id
+          const badge = item.id === 'alerts' && alertCount > 0 ? alertCount : null
           return (
             <button
               key={item.id}
@@ -85,41 +87,54 @@ export function Sidebar({ current, onNav, stats, syncing, syncProgress = 0, sync
               onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#94A3B8' } }}
             >
               {item.icon}
-              {item.label}
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {badge !== null && (
+                <span style={{
+                  background: '#DC2626', color: '#fff',
+                  fontSize: 10, fontWeight: 700, lineHeight: 1,
+                  padding: '2px 6px', borderRadius: 10, minWidth: 18, textAlign: 'center',
+                }}>
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
             </button>
           )
         })}
       </nav>
 
-      {/* Sync progress — shown at bottom when active */}
+      {/* Sync + health progress — always shown while either is active */}
       {(syncing || healthRunning) && (
-        <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {syncing && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>Syncing Medialister</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#2563EB' }}>{syncPct}%</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#CBD5E1' }}>Syncing Medialister</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#3B82F6' }}>{syncPct}%</span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 4, overflow: 'hidden', marginBottom: 3 }}>
-                <div style={{ background: '#2563EB', height: '100%', width: `${syncPct}%`, borderRadius: 3, transition: 'width 0.3s ease' }} />
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, height: 5, overflow: 'hidden', marginBottom: 5 }}>
+                <div style={{ background: '#3B82F6', height: '100%', width: `${syncPct}%`, borderRadius: 4, transition: 'width 0.4s ease' }} />
               </div>
-              <div style={{ fontSize: 10, color: '#334155' }}>Page {syncProgress} of {syncTotal} · {(syncProgress * 100).toLocaleString()} sites</div>
+              <div style={{ fontSize: 10.5, color: '#475569' }}>
+                Page {syncProgress.toLocaleString()} of {syncTotal.toLocaleString()} · {(syncProgress * 100).toLocaleString()} sites loaded
+              </div>
             </div>
           )}
 
-          {healthRunning && (
+          {(syncing || healthRunning) && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#16A34A', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>Checking sites</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {healthRunning && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }} />}
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#CBD5E1' }}>Checking availability</span>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#16A34A' }}>{healthPct}%</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#22C55E' }}>{healthPct}%</span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 4, overflow: 'hidden', marginBottom: 3 }}>
-                <div style={{ background: '#16A34A', height: '100%', width: `${healthPct}%`, borderRadius: 3, transition: 'width 0.3s ease' }} />
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, height: 5, overflow: 'hidden', marginBottom: 5 }}>
+                <div style={{ background: '#22C55E', height: '100%', width: `${healthPct}%`, borderRadius: 4, transition: 'width 0.4s ease' }} />
               </div>
-              <div style={{ fontSize: 10, color: '#334155' }}>{healthChecked.toLocaleString()} / {healthTotal.toLocaleString()} checked</div>
+              <div style={{ fontSize: 10.5, color: '#475569' }}>
+                {healthChecked.toLocaleString()} / {healthTotal.toLocaleString()} sites checked · 5 concurrent
+              </div>
             </div>
           )}
         </div>

@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { checkSite } from '../lib/siteChecker'
+import { useAction } from 'convex/react'
+import { makeFunctionReference } from 'convex/server'
 import type { Site, SiteStatus } from '../types'
+
+type CheckResult = { httpStatus: number; redirectUrl?: string; pageTitle?: string; isParked: boolean; responseTimeMs: number }
+
+// Use makeFunctionReference to avoid depending on stale generated types
+const checkDomainFn = makeFunctionReference<'action', { domain: string }, CheckResult>('checker:checkDomain')
 
 const HEALTH_TTL = 1000 * 60 * 60 * 24 // 24h
 const CONCURRENT = 5
@@ -38,7 +44,7 @@ function saveHealth(domain: string, rec: HealthRecord) {
   } catch { /* quota */ }
 }
 
-function resultToStatus(r: Awaited<ReturnType<typeof checkSite>>): SiteStatus {
+function resultToStatus(r: CheckResult): SiteStatus {
   if (!r.httpStatus || r.httpStatus === 0) return 'Unreachable'
   if (r.isParked) return 'Parked'
   if (r.httpStatus >= 500) return 'Unreachable'
@@ -64,6 +70,7 @@ interface CheckerState {
 }
 
 export function useHealthChecker(sites: Site[]) {
+  const checkDomain = useAction(checkDomainFn)
   const [state, setState] = useState<CheckerState>({
     checked: 0,
     total: 0,
@@ -121,16 +128,16 @@ export function useHealthChecker(sites: Site[]) {
 
       const results = await Promise.allSettled(
         batch.map(async domain => {
-          const result = await checkSite(domain)
+          const result = await checkDomain({ domain })
           const status = resultToStatus(result)
           const rec: HealthRecord = {
             status,
             httpStatus: result.httpStatus,
             redirectUrl: result.redirectUrl,
-            title: result.title,
+            title: result.pageTitle,
             isParked: result.isParked,
             responseTimeMs: result.responseTimeMs,
-            checkedAt: result.checkedAt ?? new Date().toISOString(),
+            checkedAt: new Date().toISOString(),
           }
           saveHealth(domain, rec)
           return { domain, rec }
@@ -159,7 +166,7 @@ export function useHealthChecker(sites: Site[]) {
 
     runningRef.current = false
     setState(s => ({ ...s, running: false }))
-  }, [])
+  }, [checkDomain])
 
   // Auto-start checker when sites load
   useEffect(() => {
