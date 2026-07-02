@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { usePaginatedQuery, useQuery } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
-import type { PaginationResult } from 'convex/server'
+import type { PaginationResult, PaginationOptions } from 'convex/server'
 import type { SiteStatus } from '../types'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { formatTraffic, getLeadingCountry, countryFlag } from '../lib/medialister'
@@ -9,7 +9,7 @@ import { formatTraffic, getLeadingCountry, countryFlag } from '../lib/medialiste
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbSite = any
 
-const listPaginatedFn = makeFunctionReference<'query', { paginationOpts: unknown }, PaginationResult<DbSite>>('sites:listPaginated')
+const listPaginatedFn = makeFunctionReference<'query', { paginationOpts: PaginationOptions }, PaginationResult<DbSite>>('sites:listPaginated')
 const statsFn = makeFunctionReference<'query', Record<string, never>, {
   total: number; active: number; warning: number; issues: number; unknown: number;
   withDr50: number; avgPrice: number; languages: number; lastChecked: number;
