@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/medialister-api/(.*)", "destination": "/api/medialister?$1" }
+  ]
+}

@@ -1,12 +1,17 @@
 import type { MedialisterResponse, Offer, Site } from '../types'
 
-const API_BASE = '/medialister-api'
+// In dev: Vite proxies /medialister-api → https://api.medialister.com
+// In prod (Vercel): /api/medialister serverless function handles it
+const isDev = import.meta.env.DEV
 const API_KEY = import.meta.env.VITE_MEDIALISTER_API_KEY
 
 export async function fetchOffersPage(page: number, perPage = 100): Promise<MedialisterResponse> {
-  const res = await fetch(`${API_BASE}/api/offers?perPage=${perPage}&page=${page}`, {
-    headers: { apikey: API_KEY },
-  })
+  const url = isDev
+    ? `/medialister-api/api/offers?perPage=${perPage}&page=${page}`
+    : `/api/medialister?page=${page}&perPage=${perPage}`
+
+  const headers: Record<string, string> = isDev ? { apikey: API_KEY } : {}
+  const res = await fetch(url, { headers })
   if (!res.ok) throw new Error(`Medialister API error: ${res.status}`)
   return res.json()
 }
