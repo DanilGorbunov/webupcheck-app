@@ -11,7 +11,7 @@ const STATUS_STYLES: Record<SiteStatus, { bg: string; color: string; dot: string
 }
 
 export function StatusBadge({ status }: { status: SiteStatus }) {
-  const s = STATUS_STYLES[status]
+  const s = STATUS_STYLES[status] ?? STATUS_STYLES['Unknown']
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,

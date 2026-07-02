@@ -66,13 +66,14 @@ export function useHealthChecker() {
 
   useEffect(() => {
     if (!sites || sites.length === 0) return
+    if (runningRef.current) return
 
     // Only check sites we haven't already processed in this session
     const toCheck = sites.filter(s => !checkedDomainsRef.current.has(s.domain))
     if (toCheck.length === 0) return
 
     runChecker(toCheck)
-  }, [sites?.length, runChecker]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sites, runChecker]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => { abortRef.current = true }

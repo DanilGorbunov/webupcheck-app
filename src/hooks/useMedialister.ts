@@ -54,7 +54,7 @@ export function useMedialister() {
   const abortRef = useRef(false)
   const startedRef = useRef(false)
 
-  const syncAll = useCallback(async (resumeFrom = 1, knownTotal = 0, knownPages = 0) => {
+  const syncAll = useCallback(async (resumeFrom = 1, existingLogId?: string, knownTotal = 0, knownPages = 0) => {
     abortRef.current = false
     setSyncing(true)
     setError(null)
@@ -96,9 +96,7 @@ export function useMedialister() {
         setTotalItems(knownTotal)
         setSyncTotal(knownPages)
         setSyncProgress(resumeFrom)
-        // We need a valid logId — it will be the currently running one
-        // We'll get it from the syncLog query value captured via closure
-        logId = '' // will be overwritten below
+        logId = existingLogId ?? ''
       }
 
       for (let page = resumeFrom === 1 ? 2 : resumeFrom; page <= totalPages; page++) {
@@ -173,7 +171,7 @@ export function useMedialister() {
       setTotalItems(total)
       setSyncTotal(pages)
       setSyncProgress(processed)
-      syncAll(processed + 1, total, pages)
+      syncAll(processed + 1, syncLog._id as string, total, pages)
       return
     }
 
