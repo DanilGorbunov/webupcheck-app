@@ -30,9 +30,38 @@ function hasSuspiciousTitle(title: string): boolean {
 
 // Level 2: body confirmation — called only when Level 1 passes.
 // Returns true only when ALL content signals say the site is empty.
+// NOTE: JS-rendered sites (React/Next.js/Vue) serve near-empty HTML without a headless browser.
+// We must NOT flag them as parked — check for framework fingerprints.
 function confirmedEmptyByBody(html: string, wordCount: number): boolean {
   // Real content → not parking
-  if (wordCount >= 300) return false
+  if (wordCount >= 150) return false
+
+  // JS framework fingerprints → SPA site, not parking
+  if (/id=["']root["']/i.test(html)) return false          // React/Vue root
+  if (/id=["']app["']/i.test(html)) return false           // Vue/Nuxt app
+  if (/__next/i.test(html)) return false                   // Next.js
+  if (/data-reactroot/i.test(html)) return false           // React SSR
+  if (/nuxt/i.test(html)) return false                     // Nuxt.js
+  if (/gatsby/i.test(html)) return false                   // Gatsby
+
+  // Open Graph tags → site is set up for social sharing (real site)
+  if (/property=["']og:image["']/i.test(html)) return false
+  if (/property=["']og:description["']/i.test(html)) return false
+  if (/property=["']og:site_name["']/i.test(html)) return false
+
+  // Canonical URL → real site with SEO setup
+  if (/rel=["']canonical["']/i.test(html)) return false
+
+  // JSON-LD structured data → definitely a real site
+  if (/application\/ld\+json/i.test(html)) return false
+
+  // Many scripts → JS-heavy real app
+  const scriptCount = (html.match(/<script[\s>]/gi) ?? []).length
+  if (scriptCount >= 4) return false
+
+  // Many stylesheets → real site
+  const styleCount = (html.match(/<link[^>]+rel=["']stylesheet["']/gi) ?? []).length
+  if (styleCount >= 2) return false
 
   // Has article/post markup → real blog content
   if (/<article[\s>]/i.test(html)) return false
@@ -44,8 +73,9 @@ function confirmedEmptyByBody(html: string, wordCount: number): boolean {
   if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b/i.test(html)) return false
   if (/\b20\d{2}-\d{2}-\d{2}\b/.test(html)) return false
 
-  // Has meaningful navigation (≥3 links in <nav>) → real site
-  const navBlock = html.match(/<nav[\s\S]*?<\/nav>/i)?.[0] ?? ''
+  // Has meaningful navigation (≥3 links in <nav> or <header>) → real site
+  const navBlock = (html.match(/<nav[\s\S]*?<\/nav>/i)?.[0] ?? '') +
+                   (html.match(/<header[\s\S]*?<\/header>/i)?.[0] ?? '')
   const navLinkCount = (navBlock.match(/<a\s/gi) ?? []).length
   if (navLinkCount >= 3) return false
 
