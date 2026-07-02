@@ -66,7 +66,7 @@ export function SiteDetailPage({ site, onBack }: Props) {
             <span style={{ color: '#D1D5DB' }}>·</span>
             <span>{site.formatType}</span>
             <span style={{ color: '#D1D5DB' }}>·</span>
-            <span style={{ fontWeight: 600, color: '#0F172A' }}>${site.price.toFixed(0)}</span>
+            <span style={{ fontWeight: 600, color: '#0F172A' }}>${(site.price ?? 0).toFixed(0)}</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
