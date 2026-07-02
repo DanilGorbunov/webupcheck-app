@@ -28,23 +28,21 @@ export const getByDomain = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    try {
-      const [active, warning, unreachable, parked, blacklisted, needsReview, unknown] = await Promise.all([
-        ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Active')).take(16384).then(r => r.length),
-        ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Warning')).take(16384).then(r => r.length),
-        ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Unreachable')).take(16384).then(r => r.length),
-        ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Parked')).take(16384).then(r => r.length),
-        ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Blacklisted')).take(16384).then(r => r.length),
-        ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'NeedsReview')).take(16384).then(r => r.length),
-        ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Unknown')).take(16384).then(r => r.length),
-      ])
-      const total = active + warning + unreachable + parked + blacklisted + needsReview + unknown
-      const issues = unreachable + parked + blacklisted
-      const checked = total - unknown
-      return { total, active, warning, unreachable, parked, blacklisted, needsReview, issues, unknown, checked, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
-    } catch {
-      return { total: 0, active: 0, warning: 0, unreachable: 0, parked: 0, blacklisted: 0, needsReview: 0, issues: 0, unknown: 0, checked: 0, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
-    }
+    const cnt = async (status: string) =>
+      (await ctx.db.query('sites').withIndex('by_status', q => q.eq('status', status)).take(16384)).length
+
+    const active      = await cnt('Active')
+    const warning     = await cnt('Warning')
+    const unreachable = await cnt('Unreachable')
+    const parked      = await cnt('Parked')
+    const blacklisted = await cnt('Blacklisted')
+    const needsReview = await cnt('NeedsReview')
+    const unknown     = await cnt('Unknown')
+
+    const total   = active + warning + unreachable + parked + blacklisted + needsReview + unknown
+    const issues  = unreachable + parked + blacklisted
+    const checked = total - unknown
+    return { total, active, warning, unreachable, parked, blacklisted, needsReview, issues, unknown, checked, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
   },
 })
 
