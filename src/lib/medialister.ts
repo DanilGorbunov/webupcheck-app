@@ -54,12 +54,15 @@ export function formatAudience(n?: number): string {
   return `${n}/mo`
 }
 
-export function getLeadingCountry(countries?: Record<string, number>): string {
+export function getLeadingCountry(countries?: unknown): string {
   if (!countries) return '—'
-  const entries = Object.entries(countries)
+  // Support both array [[name, share]] (Convex) and object {name: share} (raw)
+  const entries: [string, number][] = Array.isArray(countries)
+    ? (countries as [string, number][])
+    : Object.entries(countries as Record<string, number>)
   if (!entries.length) return '—'
-  entries.sort((a, b) => b[1] - a[1])
-  return entries[0][0]
+  const sorted = [...entries].sort((a, b) => b[1] - a[1])
+  return sorted[0][0]
 }
 
 const COUNTRY_FLAGS: Record<string, string> = {

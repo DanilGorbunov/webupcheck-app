@@ -3,6 +3,13 @@ import { useQuery, useMutation } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 import { fetchOffersPage, offerToSite } from '../lib/medialister'
 
+// Convex doesn't allow non-ASCII keys in objects (e.g. "Türkiye").
+// Convert leadingCountries {name: share} → [[name, share]] array for safe storage.
+function safeCountries(c: unknown): [string, number][] | undefined {
+  if (!c || typeof c !== 'object') return undefined
+  return Object.entries(c as Record<string, number>)
+}
+
 type SyncLogId = string
 
 const getActiveSyncLog = makeFunctionReference<'query', Record<string, never>, {
@@ -81,7 +88,7 @@ export function useMedialister() {
           timeOnSite: s.timeOnSite,
           mai: s.mai,
           semrushAuthorityScore: s.semrushAuthorityScore,
-          leadingCountries: s.leadingCountries,
+          leadingCountries: safeCountries(s.leadingCountries),
           urlExamples: s.urlExamples,
         })) })
         await updateSyncLog({ logId, processed: 1, totalPages })
@@ -112,7 +119,7 @@ export function useMedialister() {
           timeOnSite: s.timeOnSite,
           mai: s.mai,
           semrushAuthorityScore: s.semrushAuthorityScore,
-          leadingCountries: s.leadingCountries,
+          leadingCountries: safeCountries(s.leadingCountries),
           urlExamples: s.urlExamples,
         })) })
 
