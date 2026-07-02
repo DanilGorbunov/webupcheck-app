@@ -278,23 +278,27 @@ export const dismissAllAlerts = mutation({
 export const statusTrend = query({
   args: {},
   handler: async (ctx) => {
-    const since = Date.now() - 14 * 24 * 60 * 60 * 1000
-    const history = await ctx.db.query('checkHistory')
-      .withIndex('by_checked_at', q => q.gte('checkedAt', since))
-      .collect()
+    try {
+      const since = Date.now() - 14 * 24 * 60 * 60 * 1000
+      const history = await ctx.db.query('checkHistory')
+        .withIndex('by_checked_at', q => q.gte('checkedAt', since))
+        .take(8000)
 
-    const days: Record<string, { date: string; unreachable: number; warning: number; active: number; parked: number }> = {}
-    for (const entry of history) {
-      const d = new Date(entry.checkedAt)
-      const key = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      if (!days[key]) days[key] = { date: key, unreachable: 0, warning: 0, active: 0, parked: 0 }
-      const s = entry.statusAfter
-      if (s === 'Unreachable') days[key].unreachable++
-      else if (s === 'Warning') days[key].warning++
-      else if (s === 'Active') days[key].active++
-      else if (s === 'Parked') days[key].parked++
+      const days: Record<string, { date: string; unreachable: number; warning: number; active: number; parked: number }> = {}
+      for (const entry of history) {
+        const d = new Date(entry.checkedAt)
+        const key = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        if (!days[key]) days[key] = { date: key, unreachable: 0, warning: 0, active: 0, parked: 0 }
+        const s = entry.statusAfter
+        if (s === 'Unreachable') days[key].unreachable++
+        else if (s === 'Warning') days[key].warning++
+        else if (s === 'Active') days[key].active++
+        else if (s === 'Parked') days[key].parked++
+      }
+      return Object.values(days).sort((a, b) => a.date.localeCompare(b.date))
+    } catch {
+      return []
     }
-    return Object.values(days).sort((a, b) => a.date.localeCompare(b.date))
   },
 })
 
