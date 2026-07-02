@@ -4,16 +4,28 @@ import { SyncProgress } from './components/ui/SyncProgress'
 import { SitesPage } from './pages/SitesPage'
 import { SiteDetailPage } from './pages/SiteDetailPage'
 import { CheckerPage } from './pages/CheckerPage'
+import { LandingPage } from './pages/LandingPage'
 import { useMedialister } from './hooks/useMedialister'
 import type { Site } from './types'
 
 export type Page = 'dashboard' | 'sites' | 'checker' | 'alerts' | 'campaigns' | 'settings'
+type AppView = 'landing' | 'app'
 
 export default function App() {
+  const [view, setView] = useState<AppView>('landing')
   const [page, setPage] = useState<Page>('sites')
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
 
   const { sites, totalItems, loading, syncing, syncProgress, syncTotal, error } = useMedialister()
+
+  if (view === 'landing') {
+    return (
+      <LandingPage
+        onGetStarted={() => setView('app')}
+        onCheckNow={() => { setView('app'); setPage('checker') }}
+      />
+    )
+  }
 
   function renderContent() {
     if (selectedSite) {
