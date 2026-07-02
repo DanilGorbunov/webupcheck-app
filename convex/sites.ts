@@ -138,9 +138,29 @@ export const saveCheckResult = mutation({
       statusAfter: newStatus,
     })
 
-    const ALERT_STATUSES = ['Unreachable', 'Parked', 'Blacklisted', 'Suspended', 'Warning']
+    // Only alert for genuinely dead/problematic sites.
+    // HTTP 403/429/406 = bot protection — site is alive, no alert needed.
+    // Redirect = alert only if destination domain differs (not just www stripping).
     const changed = statusBefore !== newStatus
-    if (!changed || !ALERT_STATUSES.includes(newStatus)) return
+    if (!changed) return
+
+    const isAlertWorthy = (() => {
+      if (newStatus === 'Unreachable' || newStatus === 'Parked' || newStatus === 'Blacklisted' || newStatus === 'Suspended') return true
+      if (newStatus === 'Warning') {
+        // Only alert for 5xx (server errors) and external redirects
+        if (is5xx) return true
+        if (args.redirectUrl) {
+          // Ignore www ↔ non-www and https upgrades on same domain
+          const destDomain = args.redirectUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]
+          const srcDomain = site.domain.replace(/^www\./, '')
+          return destDomain !== srcDomain
+        }
+        // 403/429/406 = bot protection, skip alert
+        return false
+      }
+      return false
+    })()
+    if (!isAlertWorthy) return
 
     const severity = (newStatus === 'Unreachable' || newStatus === 'Parked') ? 'critical' : 'warning'
     const message = newStatus === 'Unreachable' && is5xx
@@ -151,8 +171,6 @@ export const saveCheckResult = mutation({
       ? `Parking page detected — title: "${args.pageTitle ?? ''}"`
       : newStatus === 'Warning' && args.redirectUrl
       ? `Redirects to ${args.redirectUrl}`
-      : newStatus === 'Warning'
-      ? `Bot protection / rate limit (HTTP ${http})`
       : `Status changed: ${statusBefore} → ${newStatus}`
 
     // Subdomain grouping: group N subdomains of same root into one alert
