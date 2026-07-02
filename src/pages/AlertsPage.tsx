@@ -10,7 +10,9 @@ type DbAlert = any
 type ConvexId = any
 
 const listAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, DbAlert[]>('sites:listAlerts')
+const countAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, number>('sites:countAlerts')
 const dismissAlertFn = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
+const dismissAllFn = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
 
 interface Props {
   onViewSite: (s: DbSite) => void
@@ -37,11 +39,14 @@ export function AlertsPage({ onViewSite }: Props) {
   const [tab, setTab] = useState<'all' | 'unresolved' | 'critical' | 'dead' | 'dismissed'>('all')
   const activeAlerts = useQuery(listAlertsFn, { dismissed: false }) ?? []
   const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true }) ?? []
+  const totalActiveCount = useQuery(countAlertsFn, { dismissed: false }) ?? 0
   const dismissAlert = useMutation(dismissAlertFn)
+  const dismissAll = useMutation(dismissAllFn)
 
   const allAlerts: DbAlert[] = tab === 'dismissed' ? dismissedAlerts : activeAlerts
 
   // Dead = confirmed: HTTP 0 / DNS, confirmed parking, or 3+ consecutive 5xx failures
+  // (undismissedCount moved below — using totalActiveCount from countAlerts query)
   const isDead = (a: DbAlert): boolean => {
     const msg = (a.message ?? '').toLowerCase()
     if (msg.includes('http 0)') || msg.includes('(http 0)')) return true           // no response
@@ -55,8 +60,6 @@ export function AlertsPage({ onViewSite }: Props) {
     if (tab === 'dead') return isDead(a)
     return true
   })
-
-  const undismissedCount = activeAlerts.length
 
   const TAB_STYLE = (t: typeof tab) => ({
     padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer',
@@ -75,6 +78,14 @@ export function AlertsPage({ onViewSite }: Props) {
             {undismissedCount > 0 ? `${undismissedCount} active alerts across your network` : 'No active alerts'}
           </p>
         </div>
+        {undismissedCount > 0 && tab !== 'dismissed' && (
+          <button
+            onClick={() => dismissAll({})}
+            style={{ padding: '7px 14px', background: 'white', color: '#6B7280', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            Dismiss All ({undismissedCount})
+          </button>
+        )}
       </div>
 
       {/* Tabs */}

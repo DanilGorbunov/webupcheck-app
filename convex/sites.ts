@@ -217,7 +217,54 @@ export const listAlerts = query({
     return ctx.db.query('alerts')
       .withIndex('by_dismissed', q => q.eq('dismissed', dismissed))
       .order('desc')
-      .take(100)
+      .take(500)
+  },
+})
+
+export const countAlerts = query({
+  args: { dismissed: v.optional(v.boolean()) },
+  handler: async (ctx, { dismissed = false }) => {
+    const alerts = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', dismissed))
+      .collect()
+    return alerts.length
+  },
+})
+
+export const dismissAllAlerts = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const alerts = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .collect()
+    const now = Date.now()
+    for (const a of alerts) {
+      await ctx.db.patch(a._id, { dismissed: true, dismissedAt: now })
+    }
+    return alerts.length
+  },
+})
+
+export const statusTrend = query({
+  args: {},
+  handler: async (ctx) => {
+    const since = Date.now() - 14 * 24 * 60 * 60 * 1000
+    const history = await ctx.db.query('checkHistory')
+      .withIndex('by_checked_at', q => q.gte('checkedAt', since))
+      .collect()
+
+    const days: Record<string, { date: string; unreachable: number; warning: number; active: number; parked: number }> = {}
+    for (const entry of history) {
+      const d = new Date(entry.checkedAt)
+      const key = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (!days[key]) days[key] = { date: key, unreachable: 0, warning: 0, active: 0, parked: 0 }
+      const s = entry.statusAfter
+      if (s === 'Unreachable') days[key].unreachable++
+      else if (s === 'Warning') days[key].warning++
+      else if (s === 'Active') days[key].active++
+      else if (s === 'Parked') days[key].parked++
+    }
+    return Object.values(days).sort((a, b) => a.date.localeCompare(b.date))
   },
 })
 

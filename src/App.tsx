@@ -14,8 +14,7 @@ import { useMedialister } from './hooks/useMedialister'
 import { useHealthChecker } from './hooks/useHealthChecker'
 import type { Site } from './types'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const listAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, Array<any>>('sites:listAlerts')
+const countAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, number>('sites:countAlerts')
 
 export type Page = 'dashboard' | 'sites' | 'checker' | 'alerts' | 'campaigns' | 'settings'
 type AppView = 'landing' | 'app'
@@ -28,8 +27,7 @@ export default function App() {
   const { syncing, syncProgress, syncTotal, totalItems, error } = useMedialister()
   const { healthChecked, healthTotal, healthRunning } = useHealthChecker()
 
-  const alerts = useQuery(listAlertsFn, { dismissed: false })
-  const alertCount = alerts?.length ?? 0
+  const alertCount = useQuery(countAlertsFn, { dismissed: false }) ?? 0
 
   if (view === 'landing') {
     return (

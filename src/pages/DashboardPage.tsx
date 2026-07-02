@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 import type { Page } from '../App'
@@ -12,6 +13,9 @@ const statsFn = makeFunctionReference<'query', Record<string, never>, {
 }>('sites:stats')
 
 const listFn = makeFunctionReference<'query', { status?: string; limit?: number }, DbSite[]>('sites:list')
+
+type TrendPoint = { date: string; unreachable: number; warning: number; active: number; parked: number }
+const statusTrendFn = makeFunctionReference<'query', Record<string, never>, TrendPoint[]>('sites:statusTrend')
 
 interface Props {
   totalItems: number
@@ -107,6 +111,129 @@ function Sparkline({ color, up }: { color: string; up: boolean }) {
   )
 }
 
+// ─── Multi-series Line Chart ──────────────────────────────────────────────────
+interface LineSeries { key: keyof TrendPoint; label: string; color: string }
+
+function LineChart({ data, series }: { data: TrendPoint[]; series: LineSeries[] }) {
+  const W = 560, H = 160, PAD = { top: 12, right: 12, bottom: 32, left: 36 }
+  const innerW = W - PAD.left - PAD.right
+  const innerH = H - PAD.top - PAD.bottom
+
+  if (!data.length) return (
+    <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 13 }}>
+      No history yet — data accumulates as sites are checked
+    </div>
+  )
+
+  const allVals = data.flatMap(d => series.map(s => d[s.key] as number))
+  const maxVal = Math.max(...allVals, 1)
+
+  const xScale = (i: number) => PAD.left + (i / Math.max(data.length - 1, 1)) * innerW
+  const yScale = (v: number) => PAD.top + innerH - (v / maxVal) * innerH
+
+  // Grid y-lines
+  const yTicks = [0, Math.round(maxVal / 2), maxVal]
+  // Tooltip state — we use SVG mouse events
+  const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null)
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg
+        width="100%" viewBox={`0 0 ${W} ${H}`}
+        onMouseLeave={() => setHover(null)}
+        style={{ overflow: 'visible' }}
+      >
+        {/* Grid */}
+        {yTicks.map(v => (
+          <g key={v}>
+            <line x1={PAD.left} x2={W - PAD.right} y1={yScale(v)} y2={yScale(v)} stroke="#F1F5F9" strokeWidth={1} />
+            <text x={PAD.left - 5} y={yScale(v) + 4} textAnchor="end" fontSize={9} fill="#94A3B8">{v}</text>
+          </g>
+        ))}
+
+        {/* Series lines */}
+        {series.map(s => {
+          const pts = data.map((d, i) => ({ x: xScale(i), y: yScale(d[s.key] as number) }))
+          // Smooth cubic bezier
+          const path = pts.reduce((acc, p, i) => {
+            if (i === 0) return `M ${p.x} ${p.y}`
+            const prev = pts[i - 1]
+            const cpx = (prev.x + p.x) / 2
+            return `${acc} C ${cpx} ${prev.y} ${cpx} ${p.y} ${p.x} ${p.y}`
+          }, '')
+          return (
+            <path key={s.key as string} d={path} fill="none" stroke={s.color} strokeWidth={2}
+              strokeLinecap="round" strokeLinejoin="round" />
+          )
+        })}
+
+        {/* Hover zones */}
+        {data.map((_, i) => (
+          <rect key={i}
+            x={xScale(i) - (innerW / data.length) / 2} y={PAD.top}
+            width={innerW / data.length} height={innerH}
+            fill="transparent"
+            onMouseEnter={(e) => setHover({ i, x: xScale(i), y: e.currentTarget.getBoundingClientRect().top })}
+          />
+        ))}
+
+        {/* Hover dots */}
+        {hover !== null && series.map(s => (
+          <circle key={s.key as string}
+            cx={xScale(hover.i)} cy={yScale(data[hover.i][s.key] as number)}
+            r={4} fill={s.color} stroke="white" strokeWidth={2} />
+        ))}
+
+        {/* Hover vertical line */}
+        {hover !== null && (
+          <line x1={xScale(hover.i)} x2={xScale(hover.i)} y1={PAD.top} y2={H - PAD.bottom}
+            stroke="#CBD5E1" strokeWidth={1} strokeDasharray="3 2" />
+        )}
+
+        {/* X axis labels */}
+        {data.map((d, i) => {
+          const skip = data.length > 10 && i % 2 !== 0
+          return skip ? null : (
+            <text key={i} x={xScale(i)} y={H - PAD.bottom + 14} textAnchor="middle" fontSize={9} fill="#94A3B8">
+              {d.date}
+            </text>
+          )
+        })}
+      </svg>
+
+      {/* Tooltip */}
+      {hover !== null && (
+        <div style={{
+          position: 'absolute', top: 8,
+          left: Math.min(xScale(hover.i) / W * 100, 60) + '%',
+          background: 'white', border: '1px solid #E2E8F0', borderRadius: 8,
+          padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', pointerEvents: 'none', zIndex: 10,
+          minWidth: 130,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>{data[hover.i].date}</div>
+          {series.map(s => (
+            <div key={s.key as string} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 11, color: '#374151' }}>{s.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#0F172A' }}>{data[hover.i][s.key]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 4 }}>
+        {series.map(s => (
+          <div key={s.key as string} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 20, height: 3, background: s.color, borderRadius: 2, display: 'inline-block' }} />
+            <span style={{ fontSize: 11, color: '#6B7280' }}>{s.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, subColor, icon, iconBg, trend }: {
   label: string; value: string; sub: string; subColor: string
@@ -133,6 +260,7 @@ function StatCard({ label, value, sub, subColor, icon, iconBg, trend }: {
 export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, onNav }: Props) {
   const stats = useQuery(statsFn, {})
   const topSites = useQuery(listFn, { limit: 50 })
+  const trend = useQuery(statusTrendFn, {})
 
   const active = stats?.active ?? 0
   const warning = stats?.warning ?? 0
@@ -327,6 +455,26 @@ export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, on
           </div>
         </div>
       )}
+
+      {/* Error trend chart */}
+      <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0F172A' }}>Error Trend — Last 14 Days</div>
+            <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 2 }}>Status changes detected per day across all checked sites</div>
+          </div>
+          <button onClick={() => onNav('alerts')} style={{ fontSize: 12, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>View alerts →</button>
+        </div>
+        <LineChart
+          data={trend ?? []}
+          series={[
+            { key: 'unreachable', label: 'Unreachable', color: '#DC2626' },
+            { key: 'warning',     label: 'Warning',     color: '#D97706' },
+            { key: 'parked',      label: 'Parked',      color: '#94A3B8' },
+            { key: 'active',      label: 'Recovered',   color: '#16A34A' },
+          ]}
+        />
+      </div>
 
       {/* Top sites by DR */}
       <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>

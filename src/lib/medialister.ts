@@ -21,22 +21,26 @@ export function offerToSite(offer: Offer): Site {
   const dr = offer.seoMetric?.ahrefsDr
   const traffic = offer.seoMetric?.organicTrafficByAhrefs ?? offer.seoMetric?.semrushOrganicTraffic
 
+  const safeNum = (n: number | undefined): number | undefined =>
+    n === undefined || isNaN(n) || !isFinite(n) ? undefined : n
+  const rawPrice = parseFloat(offer.price)
+
   return {
     id: offer.id,
     domain,
-    languages: offer.mediaProject.languages,
-    formatType: offer.formatType.name,
-    price: parseFloat(offer.price),
-    dr,
-    organicTraffic: traffic,
-    audience: offer.seoMetric?.audience,
+    languages: offer.mediaProject.languages ?? [],
+    formatType: offer.formatType.name ?? '',
+    price: isNaN(rawPrice) || !isFinite(rawPrice) ? 0 : rawPrice,
+    dr: safeNum(dr),
+    organicTraffic: safeNum(traffic),
+    audience: safeNum(offer.seoMetric?.audience),
     leadingCountries: offer.seoMetric?.leadingCountries,
-    bounceRate: offer.seoMetric?.bounceRate,
-    timeOnSite: offer.seoMetric?.timeOnSite,
-    mai: offer.seoMetric?.mai,
-    semrushAuthorityScore: offer.seoMetric?.semrushAuthorityScore,
+    bounceRate: safeNum(offer.seoMetric?.bounceRate),
+    timeOnSite: safeNum(offer.seoMetric?.timeOnSite),
+    mai: safeNum(offer.seoMetric?.mai),
+    semrushAuthorityScore: safeNum(offer.seoMetric?.semrushAuthorityScore),
     status: 'Unknown',
-    urlExamples: offer.urlExamples,
+    urlExamples: offer.urlExamples ?? [],
   }
 }
 
