@@ -7,6 +7,7 @@ const STATUS_STYLES: Record<SiteStatus, { bg: string; color: string; dot: string
   Parked:      { bg: '#f1f5f9', color: '#475569', dot: '#94A3B8' },
   Suspended:   { bg: '#ffedd5', color: '#9a3412', dot: '#EA580C' },
   Unreachable: { bg: '#fee2e2', color: '#b91c1c', dot: '#DC2626' },
+  NeedsReview: { bg: '#fdf4ff', color: '#7e22ce', dot: '#A855F7' },
   Unknown:     { bg: '#f1f5f9', color: '#6B7280', dot: '#9CA3AF' },
 }
 

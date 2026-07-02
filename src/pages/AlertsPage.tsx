@@ -41,10 +41,18 @@ export function AlertsPage({ onViewSite }: Props) {
 
   const allAlerts: DbAlert[] = tab === 'dismissed' ? dismissedAlerts : activeAlerts
 
-  const DEAD_PATTERNS = ['HTTP 0', 'HTTP 404', 'HTTP 500', 'HTTP 502', 'HTTP 503', 'unreachable']
+  // Dead = confirmed server down: HTTP 0, 502, 503, 504, or confirmed parking page
+  const DEAD_PATTERNS = ['HTTP 0)', 'HTTP 502', 'HTTP 503', 'HTTP 504', 'server down', 'parking page detected']
+  // Exclude false positives that are actually alive
+  const NOT_DEAD = ['HTTP 403', 'HTTP 429', 'HTTP 406', 'HTTP 404', 'redirects to', 'bot protection', 'needs review']
+
   const filtered = allAlerts.filter((a: DbAlert) => {
     if (tab === 'critical') return a.severity === 'critical'
-    if (tab === 'dead') return DEAD_PATTERNS.some(p => (a.message ?? '').toLowerCase().includes(p.toLowerCase()))
+    if (tab === 'dead') {
+      const msg = (a.message ?? '').toLowerCase()
+      return DEAD_PATTERNS.some(p => msg.includes(p.toLowerCase()))
+        && !NOT_DEAD.some(p => msg.includes(p.toLowerCase()))
+    }
     return true
   })
 
@@ -105,6 +113,11 @@ export function AlertsPage({ onViewSite }: Props) {
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: st.labelBg, color: st.labelColor }}>{st.label}</span>
                   </div>
                   <div style={{ fontSize: 12.5, color: '#374151' }}>{alert.message}</div>
+                  {alert.subdomains && alert.subdomains.length > 0 && (
+                    <div style={{ fontSize: 11, color: '#6B7280', marginTop: 3 }}>
+                      Subdomains: {(alert.subdomains as string[]).join(', ')}
+                    </div>
+                  )}
                 </div>
                 <span style={{ fontSize: 11.5, color: '#94A3B8', whiteSpace: 'nowrap', flexShrink: 0 }}>{formatRelTime(alert.createdAt)}</span>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

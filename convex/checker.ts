@@ -1,8 +1,9 @@
 import { action, internalAction } from './_generated/server'
 import { v } from 'convex/values'
-import { internal, api } from './_generated/api'
+import { api } from './_generated/api'
 
-const PARKED_KEYWORDS = [
+// Level 1 — confirmed parking: explicit domain-for-sale / parking pages
+const CONFIRMED_PARKING = [
   'this domain is for sale',
   'buy this domain',
   'domain is for sale',
@@ -13,15 +14,42 @@ const PARKED_KEYWORDS = [
   'afternic.com',
   'sedo.com/search',
   'dan.com/buy',
+  'this domain has been registered',
+  'domain has expired',
+  'godaddy.com/domainfind',
 ]
 
-// Direct fetch — no CORS proxy needed since this runs server-side in Convex
+// Level 2 — suspicious: empty WordPress default, coming soon, maintenance
+const SUSPICIOUS_PATTERNS = [
+  'coming soon',
+  'under construction',
+  'maintenance mode',
+  'website coming soon',
+  'launching soon',
+  'site is under maintenance',
+  'just another wordpress site',
+]
+
+function isSuspiciousTitle(title: string, domain: string): boolean {
+  if (!title) return false
+  const t = title.toLowerCase().trim()
+  const d = domain.toLowerCase().replace(/^www\./, '')
+  // "Home - SiteName" is default WordPress empty site title
+  if (/^home\s*[-–|·]\s*.+$/.test(t)) return true
+  // Domain itself as the title — no real content
+  if (t === d || t === `www.${d}` || t === domain.toLowerCase()) return true
+  // WordPress default subtitle
+  if (t.includes('just another wordpress')) return true
+  return false
+}
+
 async function fetchSite(domain: string): Promise<{
   httpStatus: number
   redirectUrl?: string
   pageTitle?: string
   metaDescription?: string
   isParked: boolean
+  isSuspicious: boolean
   responseTimeMs: number
 }> {
   const url = `https://${domain}`
@@ -42,9 +70,7 @@ async function fetchSite(domain: string): Promise<{
     const redirectUrl = finalUrl && finalUrl !== url && !finalUrl.startsWith(url + '/') ? finalUrl : undefined
 
     let html = ''
-    try {
-      html = await res.text()
-    } catch { /* ignore body read errors */ }
+    try { html = await res.text() } catch { /* ignore */ }
 
     const titleMatch = html.match(/<title[^>]*>([^<]{0,200})<\/title>/i)
     const pageTitle = titleMatch?.[1]?.trim().replace(/\s+/g, ' ')
@@ -55,11 +81,18 @@ async function fetchSite(domain: string): Promise<{
 
     const textToCheck = `${pageTitle ?? ''} ${html.slice(0, 5000)}`.toLowerCase()
     const wordCount = html.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length
-    const isParked = PARKED_KEYWORDS.some(kw => textToCheck.includes(kw)) && wordCount < 300
 
-    return { httpStatus: res.status, redirectUrl, pageTitle, metaDescription, isParked, responseTimeMs }
+    // Confirmed parking: explicit for-sale / parking page
+    const isParked = CONFIRMED_PARKING.some(kw => textToCheck.includes(kw)) && wordCount < 300
+
+    // Suspicious: empty WordPress, coming soon, etc.
+    const hasSuspiciousBody = SUSPICIOUS_PATTERNS.some(p => textToCheck.includes(p)) && wordCount < 500
+    const hasSuspiciousTitle = isSuspiciousTitle(pageTitle ?? '', domain)
+    const isSuspicious = !isParked && (hasSuspiciousBody || hasSuspiciousTitle) && wordCount < 500
+
+    return { httpStatus: res.status, redirectUrl, pageTitle, metaDescription, isParked, isSuspicious, responseTimeMs }
   } catch {
-    // Try HTTP fallback if HTTPS fails
+    // HTTP fallback
     try {
       const httpUrl = `http://${domain}`
       const res2 = await fetch(httpUrl, {
@@ -68,14 +101,13 @@ async function fetchSite(domain: string): Promise<{
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; WebUpCheck/1.0)' },
       })
       const responseTimeMs = Date.now() - start
-      return { httpStatus: res2.status, isParked: false, responseTimeMs }
+      return { httpStatus: res2.status, isParked: false, isSuspicious: false, responseTimeMs }
     } catch {
-      return { httpStatus: 0, isParked: false, responseTimeMs: Date.now() - start }
+      return { httpStatus: 0, isParked: false, isSuspicious: false, responseTimeMs: Date.now() - start }
     }
   }
 }
 
-// Check a domain without saving to DB — for use by the health checker hook
 export const checkDomain = action({
   args: { domain: v.string() },
   handler: async (_ctx, { domain }) => {

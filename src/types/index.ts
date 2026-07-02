@@ -39,7 +39,7 @@ export interface MedialisterResponse {
   }
 }
 
-export type SiteStatus = 'Active' | 'Warning' | 'Unreachable' | 'Parked' | 'Blacklisted' | 'Suspended' | 'Unknown'
+export type SiteStatus = 'Active' | 'Warning' | 'Unreachable' | 'Parked' | 'Blacklisted' | 'Suspended' | 'NeedsReview' | 'Unknown'
 
 export interface CheckResult {
   httpStatus?: number

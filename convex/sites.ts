@@ -87,6 +87,7 @@ export const saveCheckResult = mutation({
     pageTitle: v.optional(v.string()),
     metaDescription: v.optional(v.string()),
     isParked: v.optional(v.boolean()),
+    isSuspicious: v.optional(v.boolean()),
     responseTimeMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -121,27 +122,70 @@ export const saveCheckResult = mutation({
       statusAfter: newStatus,
     })
 
-    // Create alert on first check if bad, or on negative status change
-    const BAD = ['Unreachable', 'Parked', 'Blacklisted', 'Suspended']
-    const isBad = BAD.includes(newStatus)
+    const ALERT_STATUSES = ['Unreachable', 'Parked', 'Blacklisted', 'Suspended', 'Warning', 'NeedsReview']
     const changed = statusBefore !== newStatus
-    if (changed && isBad) {
-      const severity = (newStatus === 'Unreachable' || newStatus === 'Parked') ? 'critical' : 'warning'
-      const message = newStatus === 'Unreachable' ? `Site is unreachable (HTTP ${args.httpStatus ?? 0})`
-        : newStatus === 'Parked' ? `Parking page detected — title: "${args.pageTitle}"`
-        : newStatus === 'Suspended' ? `Domain suspended (HTTP ${args.httpStatus ?? 0})`
-        : newStatus === 'Warning' && args.redirectUrl ? `Redirects to ${args.redirectUrl}`
-        : `Status changed: ${statusBefore} → ${newStatus}`
+    if (!changed || !ALERT_STATUSES.includes(newStatus)) return
 
+    const severity = (newStatus === 'Unreachable' || newStatus === 'Parked') ? 'critical' : 'warning'
+    const http = args.httpStatus ?? 0
+    const message = newStatus === 'Unreachable'
+      ? `Site is unreachable (HTTP ${http})`
+      : newStatus === 'Parked'
+      ? `Parking page detected — title: "${args.pageTitle ?? ''}"`
+      : newStatus === 'NeedsReview'
+      ? `Needs review — ${args.isSuspicious ? `suspicious title: "${args.pageTitle ?? ''}"` : `HTTP ${http}`}`
+      : newStatus === 'Warning' && args.redirectUrl
+      ? `Redirects to ${args.redirectUrl}`
+      : newStatus === 'Warning'
+      ? `Bot protection / access restricted (HTTP ${http})`
+      : `Status changed: ${statusBefore} → ${newStatus}`
+
+    // Subdomain grouping: group N subdomains of same root into one alert
+    const rootDomain = getRootDomain(site.domain)
+    const isSubdomain = rootDomain !== site.domain
+
+    if (isSubdomain) {
+      const existingGroup = await ctx.db.query('alerts')
+        .withIndex('by_dismissed', q => q.eq('dismissed', false))
+        .filter(q => q.and(
+          q.eq(q.field('domain'), rootDomain),
+          q.eq(q.field('severity'), severity),
+        ))
+        .first()
+
+      if (existingGroup) {
+        const subs = existingGroup.subdomains ?? []
+        if (!subs.includes(site.domain)) {
+          const newSubs = [...subs, site.domain]
+          await ctx.db.patch(existingGroup._id, {
+            subdomains: newSubs,
+            message: `Server down — ${newSubs.length} subdomains affected`,
+          })
+        }
+        return
+      }
+
+      // First subdomain to fail → create grouped alert under root domain
       await ctx.db.insert('alerts', {
         siteId: args.siteId,
-        domain: site.domain,
+        domain: rootDomain,
         severity,
-        message,
+        message: `Server down (subdomain: ${site.domain})`,
+        subdomains: [site.domain],
         createdAt: Date.now(),
         dismissed: false,
       })
+      return
     }
+
+    await ctx.db.insert('alerts', {
+      siteId: args.siteId,
+      domain: site.domain,
+      severity,
+      message,
+      createdAt: Date.now(),
+      dismissed: false,
+    })
   },
 })
 
@@ -261,13 +305,22 @@ export const siteHistory = query({
 function deriveStatus(r: {
   httpStatus?: number
   isParked?: boolean
+  isSuspicious?: boolean
   redirectUrl?: string
 }): string {
   if (!r.httpStatus || r.httpStatus === 0) return 'Unreachable'
   if (r.isParked) return 'Parked'
+  if (r.httpStatus === 502 || r.httpStatus === 503 || r.httpStatus === 504) return 'Unreachable'
   if (r.httpStatus === 404 || r.httpStatus >= 500) return 'Unreachable'
-  if (r.httpStatus === 403 || r.httpStatus === 429) return 'Warning'
+  if (r.httpStatus === 403 || r.httpStatus === 429 || r.httpStatus === 406) return 'Warning'
   if (r.httpStatus === 301 || r.httpStatus === 302) return 'Warning'
+  if (r.isSuspicious) return 'NeedsReview'
   if (r.httpStatus >= 200 && r.httpStatus < 300) return 'Active'
   return 'Unknown'
+}
+
+function getRootDomain(domain: string): string {
+  const parts = domain.split('.')
+  if (parts.length <= 2) return domain
+  return parts.slice(-2).join('.')
 }

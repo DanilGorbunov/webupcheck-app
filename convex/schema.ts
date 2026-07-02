@@ -56,6 +56,7 @@ export default defineSchema({
     domain: v.string(),
     severity: v.string(), // critical | warning | info
     message: v.string(),
+    subdomains: v.optional(v.array(v.string())), // grouped subdomain alerts
     createdAt: v.number(),
     dismissed: v.boolean(),
     dismissedAt: v.optional(v.number()),
