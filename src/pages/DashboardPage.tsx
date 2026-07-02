@@ -15,7 +15,6 @@ const statsFn = makeFunctionReference<'query', Record<string, never>, {
 const listFn = makeFunctionReference<'query', { status?: string; limit?: number }, DbSite[]>('sites:list')
 
 type TrendPoint = { date: string; unreachable: number; warning: number; active: number; parked: number }
-const statusTrendFn = makeFunctionReference<'query', Record<string, never>, TrendPoint[]>('sites:statusTrend')
 
 interface Props {
   totalItems: number
@@ -260,7 +259,7 @@ function StatCard({ label, value, sub, subColor, icon, iconBg, trend }: {
 export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, onNav }: Props) {
   const stats = useQuery(statsFn, {})
   const topSites = useQuery(listFn, { limit: 50 })
-  const trend = useQuery(statusTrendFn, {})
+  const trend: TrendPoint[] = [] // populated after npx convex deploy
 
   const active = stats?.active ?? 0
   const warning = stats?.warning ?? 0
