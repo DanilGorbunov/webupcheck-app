@@ -34,15 +34,17 @@ function formatRelTime(ts: number): string {
 }
 
 export function AlertsPage({ onViewSite }: Props) {
-  const [tab, setTab] = useState<'all' | 'unresolved' | 'critical' | 'dismissed'>('all')
+  const [tab, setTab] = useState<'all' | 'unresolved' | 'critical' | 'dead' | 'dismissed'>('all')
   const activeAlerts = useQuery(listAlertsFn, { dismissed: false }) ?? []
   const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true }) ?? []
   const dismissAlert = useMutation(dismissAlertFn)
 
   const allAlerts: DbAlert[] = tab === 'dismissed' ? dismissedAlerts : activeAlerts
 
+  const DEAD_PATTERNS = ['HTTP 0', 'HTTP 404', 'HTTP 500', 'HTTP 502', 'HTTP 503', 'unreachable']
   const filtered = allAlerts.filter((a: DbAlert) => {
     if (tab === 'critical') return a.severity === 'critical'
+    if (tab === 'dead') return DEAD_PATTERNS.some(p => (a.message ?? '').toLowerCase().includes(p.toLowerCase()))
     return true
   })
 
@@ -69,7 +71,7 @@ export function AlertsPage({ onViewSite }: Props) {
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid #E2E8F0', marginBottom: 18 }}>
-        {(['all', 'unresolved', 'critical', 'dismissed'] as const).map(t => (
+        {(['all', 'unresolved', 'critical', 'dead', 'dismissed'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={TAB_STYLE(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
             {t === 'all' && undismissedCount > 0 && (
@@ -112,6 +114,14 @@ export function AlertsPage({ onViewSite }: Props) {
                   >
                     View Site
                   </button>
+                  <a
+                    href={`https://${alert.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ padding: '5px 10px', fontSize: 12, color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: 5, background: '#EFF6FF', textDecoration: 'none', fontWeight: 500 }}
+                  >
+                    Open →
+                  </a>
                   {!alert.dismissed && (
                     <button
                       onClick={() => dismissAlert({ alertId: alert._id })}

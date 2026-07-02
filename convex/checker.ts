@@ -3,10 +3,16 @@ import { v } from 'convex/values'
 import { internal, api } from './_generated/api'
 
 const PARKED_KEYWORDS = [
-  'domain is for sale', 'domain for sale', 'buy this domain',
-  'domain available', 'parked by', 'this domain is available',
-  'domain parking', 'godaddy', 'sedo', 'dan.com',
-  'this domain is parked', 'domain is parked',
+  'this domain is for sale',
+  'buy this domain',
+  'domain is for sale',
+  'parkingcrew.net',
+  'hugedomains.com',
+  'domain parking',
+  'undeveloped.com',
+  'afternic.com',
+  'sedo.com/search',
+  'dan.com/buy',
 ]
 
 // Direct fetch — no CORS proxy needed since this runs server-side in Convex
@@ -26,8 +32,9 @@ async function fetchSite(domain: string): Promise<{
       signal: AbortSignal.timeout(15000),
       redirect: 'follow',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; WebUpCheck/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
       },
     })
     const responseTimeMs = Date.now() - start
@@ -47,7 +54,8 @@ async function fetchSite(domain: string): Promise<{
     const metaDescription = descMatch?.[1]?.trim()
 
     const textToCheck = `${pageTitle ?? ''} ${html.slice(0, 5000)}`.toLowerCase()
-    const isParked = PARKED_KEYWORDS.some(kw => textToCheck.includes(kw))
+    const wordCount = html.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length
+    const isParked = PARKED_KEYWORDS.some(kw => textToCheck.includes(kw)) && wordCount < 300
 
     return { httpStatus: res.status, redirectUrl, pageTitle, metaDescription, isParked, responseTimeMs }
   } catch {

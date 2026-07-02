@@ -126,7 +126,7 @@ export const saveCheckResult = mutation({
     const isBad = BAD.includes(newStatus)
     const changed = statusBefore !== newStatus
     if (changed && isBad) {
-      const severity = ['Unreachable', 'Blacklisted', 'Parked', 'Suspended'].includes(newStatus) ? 'critical' : 'warning'
+      const severity = (newStatus === 'Unreachable' || newStatus === 'Parked') ? 'critical' : 'warning'
       const message = newStatus === 'Unreachable' ? `Site is unreachable (HTTP ${args.httpStatus ?? 0})`
         : newStatus === 'Parked' ? `Parking page detected — title: "${args.pageTitle}"`
         : newStatus === 'Suspended' ? `Domain suspended (HTTP ${args.httpStatus ?? 0})`
@@ -264,8 +264,9 @@ function deriveStatus(r: {
   redirectUrl?: string
 }): string {
   if (!r.httpStatus || r.httpStatus === 0) return 'Unreachable'
-  if (r.httpStatus >= 400) return 'Unreachable'
   if (r.isParked) return 'Parked'
+  if (r.httpStatus === 404 || r.httpStatus >= 500) return 'Unreachable'
+  if (r.httpStatus === 403 || r.httpStatus === 429) return 'Warning'
   if (r.httpStatus === 301 || r.httpStatus === 302) return 'Warning'
   if (r.httpStatus >= 200 && r.httpStatus < 300) return 'Active'
   return 'Unknown'
