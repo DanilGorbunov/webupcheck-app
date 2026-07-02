@@ -13,6 +13,7 @@ const statsFn = makeFunctionReference<'query', Record<string, never>, {
 }>('sites:stats')
 
 const listFn = makeFunctionReference<'query', { status?: string; limit?: number }, DbSite[]>('sites:list')
+const statusTrendFn = makeFunctionReference<'query', Record<string, never>, TrendPoint[]>('sites:statusTrend')
 
 type TrendPoint = { date: string; unreachable: number; warning: number; active: number; parked: number }
 
@@ -22,49 +23,6 @@ interface Props {
   syncProgress: number
   syncTotal: number
   onNav: (page: Page) => void
-}
-
-// ─── Donut Chart ──────────────────────────────────────────────────────────────
-interface DonutSlice { value: number; color: string; label: string }
-
-function DonutChart({ slices, size = 140 }: { slices: DonutSlice[]; size?: number }) {
-  const total = slices.reduce((s, x) => s + x.value, 0)
-  if (total === 0) return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={size / 2} cy={size / 2} r={size / 2 - 8} fill="none" stroke="#E2E8F0" strokeWidth={18} />
-    </svg>
-  )
-
-  const cx = size / 2, cy = size / 2, r = size / 2 - 10
-  const circ = 2 * Math.PI * r
-
-  let cumulative = 0
-  const paths = slices.map((sl, i) => {
-    const pct = sl.value / total
-    const dash = pct * circ
-    const gap = circ - dash
-    const offset = circ * (1 - cumulative) - circ * 0.25 // start from top
-    cumulative += pct
-    return (
-      <circle
-        key={i}
-        cx={cx} cy={cy} r={r}
-        fill="none"
-        stroke={sl.color}
-        strokeWidth={18}
-        strokeDasharray={`${dash} ${gap}`}
-        strokeDashoffset={offset}
-        style={{ transition: 'stroke-dasharray 0.6s ease' }}
-      />
-    )
-  })
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F1F5F9" strokeWidth={18} />
-      {paths}
-    </svg>
-  )
 }
 
 // ─── Horizontal Bar Chart ─────────────────────────────────────────────────────
@@ -259,7 +217,7 @@ function StatCard({ label, value, sub, subColor, icon, iconBg, trend }: {
 export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, onNav }: Props) {
   const stats = useQuery(statsFn, {})
   const topSites = useQuery(listFn, { limit: 50 })
-  const trend: TrendPoint[] = [] // populated after npx convex deploy
+  const trend = useQuery(statusTrendFn, {}) ?? []
 
   const active = stats?.active ?? 0
   const warning = stats?.warning ?? 0
@@ -274,16 +232,6 @@ export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, on
 
   const syncPct = syncTotal > 0 ? Math.round((syncProgress / syncTotal) * 100) : 100
 
-  // Donut slices
-  const donutSlices: DonutSlice[] = [
-    { value: active,      color: '#16A34A', label: 'Active' },
-    { value: warning,     color: '#D97706', label: 'Warning' },
-    { value: unreachable, color: '#DC2626', label: 'Unreachable' },
-    { value: parked,      color: '#94A3B8', label: 'Parked' },
-    { value: needsReview, color: '#A855F7', label: 'Needs Review' },
-    { value: blacklisted, color: '#7C3AED', label: 'Blacklisted' },
-    { value: unknown,     color: '#E2E8F0', label: 'Unknown' },
-  ].filter(s => s.value > 0)
 
   // Issue breakdown bars
   const issueMax = Math.max(unreachable, parked, warning, blacklisted, needsReview, 1)
@@ -358,27 +306,37 @@ export function DashboardPage({ totalItems, syncing, syncProgress, syncTotal, on
       {/* Charts row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
 
-        {/* Status Distribution — donut */}
+        {/* Status Distribution — line chart */}
         <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>Status Distribution</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <DonutChart slices={donutSlices} size={140} />
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', lineHeight: 1 }}>{checked > 0 ? `${Math.round((active / checked) * 100)}%` : '—'}</div>
-                <div style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>healthy</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
-              {donutSlices.map(sl => (
-                <div key={sl.label} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: sl.color, flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: 12, color: '#374151' }}>{sl.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{sl.value.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0F172A' }}>Status Distribution</div>
+            <span style={{ fontSize: 11, color: '#94A3B8' }}>Last 14 days</span>
           </div>
+          {/* Current counts row */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 14, flexWrap: 'wrap' as const }}>
+            {[
+              { label: 'Active', value: active, color: '#16A34A' },
+              { label: 'Warning', value: warning, color: '#D97706' },
+              { label: 'Unreachable', value: unreachable, color: '#DC2626' },
+              { label: 'Parked', value: parked, color: '#94A3B8' },
+              { label: 'Unknown', value: unknown, color: '#E2E8F0' },
+            ].map(s => (
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11.5, color: '#374151' }}>{s.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginLeft: 2 }}>{s.value.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <LineChart
+            data={trend}
+            series={[
+              { key: 'active',      label: 'Active',      color: '#16A34A' },
+              { key: 'warning',     label: 'Warning',     color: '#D97706' },
+              { key: 'unreachable', label: 'Unreachable', color: '#DC2626' },
+              { key: 'parked',      label: 'Parked',      color: '#94A3B8' },
+            ]}
+          />
         </div>
 
         {/* Sites with Issues — bar chart */}
