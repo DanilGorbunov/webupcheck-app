@@ -78,9 +78,6 @@ export default function App() {
       />
 
       <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
-        {error && (
-          <div style={{ padding: 28, color: '#DC2626', fontSize: 13 }}>Error: {error}</div>
-        )}
         {renderContent()}
       </div>
     </div>

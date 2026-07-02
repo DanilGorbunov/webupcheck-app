@@ -283,10 +283,11 @@ export const upsertBatch = mutation({
   handler: async (ctx, { sites }) => {
     for (const site of sites) {
       const existing = await ctx.db.query('sites').withIndex('by_domain', q => q.eq('domain', site.domain)).first()
+      const clean = Object.fromEntries(Object.entries(site).filter(([, val]) => val !== undefined))
       if (existing) {
-        await ctx.db.patch(existing._id, { ...site, medialistSyncedAt: Date.now() })
+        await ctx.db.patch(existing._id, { ...clean, medialistSyncedAt: Date.now() })
       } else {
-        await ctx.db.insert('sites', { ...site, status: 'Unknown', medialistSyncedAt: Date.now() })
+        await ctx.db.insert('sites', { ...clean, status: 'Unknown', medialistSyncedAt: Date.now() })
       }
     }
   }
