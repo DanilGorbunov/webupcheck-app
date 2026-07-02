@@ -50,8 +50,8 @@ export function Sidebar({ current, onNav, stats }: Props) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9', letterSpacing: '-0.2px' }}>PRNEWS.IO</div>
-            <div style={{ fontSize: 10, color: '#475569', fontWeight: 500, marginTop: 1 }}>Site Monitor</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#F1F5F9', letterSpacing: '-0.2px' }}>WebUpCheck</div>
+            <div style={{ fontSize: 10, color: '#475569', fontWeight: 500, marginTop: 1 }}>by PRNEWS.IO</div>
           </div>
         </div>
       </div>

@@ -6,6 +6,9 @@ import { SiteDetailPage } from './pages/SiteDetailPage'
 import { CheckerPage } from './pages/CheckerPage'
 import { LandingPage } from './pages/LandingPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { AlertsPage } from './pages/AlertsPage'
+import { CampaignsPage } from './pages/CampaignsPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { useMedialister } from './hooks/useMedialister'
 import type { Site } from './types'
 
@@ -41,11 +44,16 @@ export default function App() {
     if (page === 'checker') {
       return <CheckerPage />
     }
-    return (
-      <div style={{ padding: '26px 28px', color: '#94A3B8', fontSize: 14 }}>
-        {page.charAt(0).toUpperCase() + page.slice(1)} — coming soon
-      </div>
-    )
+    if (page === 'alerts') {
+      return <AlertsPage sites={sites} onViewSite={s => setSelectedSite(s)} />
+    }
+    if (page === 'campaigns') {
+      return <CampaignsPage />
+    }
+    if (page === 'settings') {
+      return <SettingsPage />
+    }
+    return null
   }
 
   return (

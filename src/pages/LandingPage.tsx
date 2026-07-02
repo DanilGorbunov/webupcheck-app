@@ -59,7 +59,7 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
             <div style={{ width: 30, height: 30, background: 'linear-gradient(135deg,#2563EB,#1D4ED8)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             </div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#F1F5F9', letterSpacing: '-0.2px' }}>PRNEWS.IO</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#F1F5F9', letterSpacing: '-0.2px' }}>WebUpCheck</span>
           </div>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             {['Features', 'Pricing', 'Blog'].map(n => (
@@ -269,7 +269,7 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
               <div style={{ width: 28, height: 28, background: 'linear-gradient(135deg,#2563EB,#1D4ED8)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
               </div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#F1F5F9' }}>PRNEWS.IO</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#F1F5F9' }}>WebUpCheck</span>
             </div>
             <nav style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
               {['Features', 'Pricing', 'Blog', 'Login', 'Sign Up'].map(n => (
@@ -278,7 +278,7 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
             </nav>
           </div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-            <span style={{ fontSize: 11.5, color: '#475569' }}>© 2026 PRNEWS.IO. All rights reserved.</span>
+            <span style={{ fontSize: 11.5, color: '#475569' }}>© 2026 WebUpCheck. All rights reserved.</span>
             <div style={{ display: 'flex', gap: 16 }}>
               <a href="#" style={{ fontSize: 11.5, color: '#475569', textDecoration: 'none' }}>Privacy</a>
               <a href="#" style={{ fontSize: 11.5, color: '#475569', textDecoration: 'none' }}>Terms</a>
