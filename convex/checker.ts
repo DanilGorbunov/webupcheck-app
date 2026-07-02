@@ -1,6 +1,6 @@
 import { action, internalAction } from './_generated/server'
 import { v } from 'convex/values'
-import { internal } from './_generated/api'
+import { internal, api } from './_generated/api'
 
 const PARKED_KEYWORDS = [
   'domain is for sale', 'domain for sale', 'buy this domain',
@@ -79,7 +79,7 @@ export const checkOneSite = action({
   args: { domain: v.string(), siteId: v.id('sites') },
   handler: async (ctx, { domain, siteId }) => {
     const result = await fetchSite(domain)
-    await ctx.runMutation(internal.sites.saveCheckResult, { siteId, ...result })
+    await ctx.runMutation(api.sites.saveCheckResult, { siteId, ...result })
     return result
   },
 })
@@ -93,7 +93,7 @@ export const checkBatch = internalAction({
     const results = await Promise.allSettled(
       batch.map(async ({ domain, siteId }) => {
         const result = await fetchSite(domain)
-        await ctx.runMutation(internal.sites.saveCheckResult, { siteId, ...result })
+        await ctx.runMutation(api.sites.saveCheckResult, { siteId, ...result })
         return { domain, ...result }
       })
     )
