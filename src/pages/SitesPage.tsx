@@ -1,0 +1,238 @@
+import { useState, useMemo } from 'react'
+import type { Site, SiteStatus } from '../types'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { formatTraffic, getLeadingCountry, countryFlag } from '../lib/medialister'
+
+interface Props {
+  sites: Site[]
+  totalItems: number
+  syncing: boolean
+  onViewSite: (site: Site) => void
+}
+
+type SortCol = 'domain' | 'dr' | 'traffic' | 'price' | 'status'
+type SortDir = 'asc' | 'desc'
+
+const PAGE_SIZE = 50
+
+export function SitesPage({ sites, totalItems, onViewSite }: Props) {
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<SiteStatus | 'all'>('all')
+  const [langFilter, setLangFilter] = useState('all')
+  const [sortCol, setSortCol] = useState<SortCol>('dr')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [page, setPage] = useState(1)
+
+  const filtered = useMemo(() => {
+    let s = [...sites]
+    if (search) {
+      const q = search.toLowerCase()
+      s = s.filter(x => x.domain.toLowerCase().includes(q))
+    }
+    if (statusFilter !== 'all') s = s.filter(x => x.status === statusFilter)
+    if (langFilter !== 'all') s = s.filter(x => x.languages.includes(langFilter))
+
+    s.sort((a, b) => {
+      let av: number | string = 0, bv: number | string = 0
+      if (sortCol === 'domain') { av = a.domain; bv = b.domain }
+      else if (sortCol === 'dr') { av = a.dr ?? -1; bv = b.dr ?? -1 }
+      else if (sortCol === 'traffic') { av = a.organicTraffic ?? -1; bv = b.organicTraffic ?? -1 }
+      else if (sortCol === 'price') { av = a.price; bv = b.price }
+      else if (sortCol === 'status') { av = a.status; bv = b.status }
+      if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv as string) : (bv as string).localeCompare(av)
+      return sortDir === 'asc' ? av - (bv as number) : (bv as number) - av
+    })
+    return s
+  }, [sites, search, statusFilter, langFilter, sortCol, sortDir])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('desc') }
+    setPage(1)
+  }
+
+  const thStyle = (col: SortCol) => ({
+    padding: '9px 16px', textAlign: 'left' as const,
+    fontSize: 10.5, fontWeight: 600, color: sortCol === col ? '#2563EB' : '#64748B',
+    textTransform: 'uppercase' as const, letterSpacing: '0.05em',
+    borderBottom: '1px solid #E2E8F0', cursor: 'pointer', userSelect: 'none' as const,
+    whiteSpace: 'nowrap' as const,
+  })
+
+  const arrow = (col: SortCol) => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
+
+  return (
+    <div style={{ padding: '26px 28px', minHeight: '100%', background: '#F8FAFC' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 22 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0F172A', letterSpacing: '-0.4px' }}>Partner Sites</h1>
+          <p style={{ fontSize: 12.5, color: '#64748B', marginTop: 3 }}>
+            {totalItems.toLocaleString()} publisher domains from Medialister · {sites.length.toLocaleString()} loaded
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'white', color: '#374151', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Stats cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+        {[
+          { label: 'Total Sites', value: totalItems.toLocaleString(), sub: `${sites.length.toLocaleString()} loaded`, color: '#2563EB', bg: '#EFF6FF' },
+          { label: 'With DR 50+', value: sites.filter(s => (s.dr ?? 0) >= 50).length.toLocaleString(), sub: 'High authority', color: '#16A34A', bg: '#F0FDF4' },
+          { label: 'Avg Price', value: sites.length ? `$${(sites.reduce((a, b) => a + b.price, 0) / sites.length).toFixed(0)}` : '—', sub: 'per placement', color: '#D97706', bg: '#FFFBEB' },
+          { label: 'Languages', value: String(new Set(sites.flatMap(s => s.languages)).size), sub: 'unique languages', color: '#7C3AED', bg: '#F5F3FF' },
+        ].map(card => (
+          <div key={card.label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, padding: '16px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>{card.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#0F172A', letterSpacing: '-1px', lineHeight: 1 }}>{card.value}</div>
+            <div style={{ fontSize: 11.5, color: card.color, marginTop: 5, fontWeight: 500 }}>{card.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter bar */}
+      <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+          <svg style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            type="text"
+            placeholder="Search domain..."
+            style={{ width: '100%', padding: '6px 10px 6px 30px', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 12.5, color: '#374151', outline: 'none', fontFamily: 'inherit', background: 'white' }}
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value as SiteStatus | 'all'); setPage(1) }}
+          style={{ padding: '6px 10px', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 12.5, color: '#374151', background: 'white', cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
+        >
+          <option value="all">All Status</option>
+          <option value="Active">Active</option>
+          <option value="Warning">Warning</option>
+          <option value="Unreachable">Unreachable</option>
+          <option value="Parked">Parked</option>
+          <option value="Blacklisted">Blacklisted</option>
+        </select>
+        <select
+          value={langFilter}
+          onChange={e => { setLangFilter(e.target.value); setPage(1) }}
+          style={{ padding: '6px 10px', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 12.5, color: '#374151', background: 'white', cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
+        >
+          <option value="all">All Languages</option>
+          {['en', 'de', 'fr', 'es', 'it', 'uk', 'ru', 'pl', 'pt', 'nl'].map(l => (
+            <option key={l} value={l}>{l.toUpperCase()}</option>
+          ))}
+        </select>
+        <span style={{ fontSize: 12, color: '#94A3B8', paddingLeft: 4 }}>{filtered.length.toLocaleString()} results</span>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#F8FAFC' }}>
+              <th style={thStyle('domain')} onClick={() => toggleSort('domain')}>Domain{arrow('domain')}</th>
+              <th style={{ ...thStyle('domain'), cursor: 'default' }}>Country</th>
+              <th style={{ ...thStyle('domain'), cursor: 'default' }}>Language</th>
+              <th style={thStyle('dr')} onClick={() => toggleSort('dr')}>DR{arrow('dr')}</th>
+              <th style={thStyle('traffic')} onClick={() => toggleSort('traffic')}>Traffic{arrow('traffic')}</th>
+              <th style={thStyle('price')} onClick={() => toggleSort('price')}>Price{arrow('price')}</th>
+              <th style={{ ...thStyle('domain'), cursor: 'default' }}>Format</th>
+              <th style={thStyle('status')} onClick={() => toggleSort('status')}>Status{arrow('status')}</th>
+              <th style={{ padding: '9px 14px', borderBottom: '1px solid #E2E8F0' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.map(site => {
+              const country = getLeadingCountry(site.leadingCountries)
+              const flag = countryFlag(country)
+              return (
+                <tr
+                  key={site.id}
+                  style={{ borderTop: '1px solid #F1F5F9', cursor: 'pointer', transition: 'background 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F0F7FF'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  onClick={() => onViewSite(site)}
+                >
+                  <td style={{ padding: '10px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 22, height: 22, background: '#EFF6FF', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{site.domain}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 16px', fontSize: 12.5, color: '#6B7280' }}>
+                    {flag} {country !== '—' ? country.slice(0, 2).toUpperCase() : '—'}
+                  </td>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#6B7280', fontWeight: 500 }}>
+                    {site.languages.join(', ').toUpperCase()}
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: site.dr ? (site.dr >= 70 ? '#16A34A' : site.dr >= 40 ? '#D97706' : '#DC2626') : '#9CA3AF' }}>
+                      {site.dr ?? '—'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 16px', fontSize: 12.5, color: '#374151', fontWeight: 500 }}>
+                    {formatTraffic(site.organicTraffic)}
+                  </td>
+                  <td style={{ padding: '10px 16px', fontSize: 12.5, fontWeight: 600, color: '#0F172A' }}>
+                    ${site.price.toFixed(0)}
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <span style={{ fontSize: 11, color: '#6B7280', background: '#F1F5F9', padding: '2px 7px', borderRadius: 4, fontWeight: 500 }}>{site.formatType}</span>
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <StatusBadge status={site.status} />
+                  </td>
+                  <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                    <button
+                      style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: '#374151', cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}
+                      onClick={e => { e.stopPropagation(); onViewSite(site) }}
+                    >
+                      View →
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+
+        {/* Pagination */}
+        <div style={{ padding: '10px 14px', borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#FAFAFA' }}>
+          <span style={{ fontSize: 12, color: '#6B7280' }}>
+            Showing {((page - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * PAGE_SIZE, filtered.length).toLocaleString()} of {filtered.length.toLocaleString()}
+          </span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: page === 1 ? '#CBD5E1' : '#374151', cursor: page === 1 ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+            >
+              ← Prev
+            </button>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', padding: '0 6px' }}>{page} / {totalPages}</span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: page === totalPages ? '#CBD5E1' : '#374151', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
