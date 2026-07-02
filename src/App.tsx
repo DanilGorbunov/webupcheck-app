@@ -5,6 +5,7 @@ import { SitesPage } from './pages/SitesPage'
 import { SiteDetailPage } from './pages/SiteDetailPage'
 import { CheckerPage } from './pages/CheckerPage'
 import { LandingPage } from './pages/LandingPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { useMedialister } from './hooks/useMedialister'
 import type { Site } from './types'
 
@@ -13,7 +14,7 @@ type AppView = 'landing' | 'app'
 
 export default function App() {
   const [view, setView] = useState<AppView>('landing')
-  const [page, setPage] = useState<Page>('sites')
+  const [page, setPage] = useState<Page>('dashboard')
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
 
   const { sites, totalItems, loading, syncing, syncProgress, syncTotal, error } = useMedialister()
@@ -33,6 +34,9 @@ export default function App() {
     }
     if (page === 'sites') {
       return <SitesPage sites={sites} totalItems={totalItems} syncing={syncing} onViewSite={s => setSelectedSite(s)} />
+    }
+    if (page === 'dashboard') {
+      return <DashboardPage sites={sites} totalItems={totalItems} syncing={syncing} syncProgress={syncProgress} syncTotal={syncTotal} onNav={p => { setPage(p); setSelectedSite(null) }} />
     }
     if (page === 'checker') {
       return <CheckerPage />
