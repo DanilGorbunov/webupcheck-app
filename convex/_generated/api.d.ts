@@ -8,13 +8,23 @@
  * @module
  */
 
+import type * as checker from "../checker.js";
+import type * as crons from "../crons.js";
+import type * as scheduler from "../scheduler.js";
+import type * as sites from "../sites.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  checker: typeof checker;
+  crons: typeof crons;
+  scheduler: typeof scheduler;
+  sites: typeof sites;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
