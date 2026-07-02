@@ -9,7 +9,7 @@ type DbAlert = any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ConvexId = any
 
-const listAlertsFn   = makeFunctionReference<'query',    { dismissed?: boolean }, DbAlert[]>('sites:listAlerts')
+const listAlertsFn   = makeFunctionReference<'query',    { dismissed?: boolean; limit?: number }, DbAlert[]>('sites:listAlerts')
 const dismissAlertFn = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
 const dismissAllFn   = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
 
@@ -60,9 +60,11 @@ function isDead(a: DbAlert): boolean {
 export function AlertsPage({ onViewSite }: Props) {
   const [tab, setTab]           = useState<Tab>('all')
   const [httpFilter, setHttpFilter] = useState<string | null>(null)
+  const [activeLimit, setActiveLimit]       = useState(500)
+  const [dismissedLimit, setDismissedLimit] = useState(500)
 
-  const activeAlerts    = useQuery(listAlertsFn, { dismissed: false }) ?? []
-  const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true })  ?? []
+  const activeAlerts    = useQuery(listAlertsFn, { dismissed: false, limit: activeLimit }) ?? []
+  const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true,  limit: dismissedLimit }) ?? []
   const undismissedCount = activeAlerts.length
   const dismissAlert    = useMutation(dismissAlertFn)
   const dismissAll      = useMutation(dismissAllFn)
@@ -272,6 +274,24 @@ export function AlertsPage({ onViewSite }: Props) {
           })}
         </div>
       )}
+
+      {/* Load more */}
+      {(() => {
+        const currentList = tab === 'dismissed' ? dismissedAlerts : activeAlerts
+        const currentLimit = tab === 'dismissed' ? dismissedLimit : activeLimit
+        const setLimit = tab === 'dismissed' ? setDismissedLimit : setActiveLimit
+        if (currentList.length < currentLimit) return null
+        return (
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button
+              onClick={() => setLimit(l => l + 500)}
+              style={{ padding: '8px 24px', background: 'white', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, color: '#374151', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+            >
+              Load more ({currentList.length} shown)
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }

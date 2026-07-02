@@ -239,12 +239,15 @@ export const dismissAlert = mutation({
 })
 
 export const listAlerts = query({
-  args: { dismissed: v.optional(v.boolean()) },
-  handler: async (ctx, { dismissed = false }) => {
+  args: {
+    dismissed: v.optional(v.boolean()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { dismissed = false, limit = 500 }) => {
     return ctx.db.query('alerts')
       .withIndex('by_dismissed', q => q.eq('dismissed', dismissed))
       .order('desc')
-      .take(500)
+      .take(Math.min(limit, 4000))
   },
 })
 

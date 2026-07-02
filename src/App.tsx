@@ -14,7 +14,7 @@ import { useMedialister } from './hooks/useMedialister'
 import { useHealthChecker } from './hooks/useHealthChecker'
 import type { Site } from './types'
 
-const listAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, Array<unknown>>('sites:listAlerts')
+const listAlertsFn = makeFunctionReference<'query', { dismissed?: boolean; limit?: number }, Array<unknown>>('sites:listAlerts')
 
 export type Page = 'dashboard' | 'sites' | 'checker' | 'alerts' | 'campaigns' | 'settings'
 type AppView = 'landing' | 'app'
