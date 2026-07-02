@@ -187,8 +187,9 @@ export const upsertBatch = mutation({
 export const startSyncLog = mutation({
   args: { totalItems: v.number(), totalPages: v.number() },
   handler: async (ctx, args) => {
-    const running = await ctx.db.query('syncLog').withIndex('by_type', q => q.eq('type', 'medialister_sync'))
-      .filter(q => q.eq(q.field('status'), 'running')).collect()
+    const running = await ctx.db.query('syncLog')
+      .filter(q => q.and(q.eq(q.field('type'), 'medialister_sync'), q.eq(q.field('status'), 'running')))
+      .collect()
     for (const log of running) await ctx.db.patch(log._id, { status: 'failed', message: 'interrupted' })
     return ctx.db.insert('syncLog', {
       type: 'medialister_sync', startedAt: Date.now(), totalItems: args.totalItems,
@@ -214,8 +215,11 @@ export const completeSyncLog = mutation({
 export const getActiveSyncLog = query({
   args: {},
   handler: async (ctx) => {
-    return ctx.db.query('syncLog').withIndex('by_type', q => q.eq('type', 'medialister_sync'))
-      .order('desc').first()
+    const logs = await ctx.db.query('syncLog')
+      .filter(q => q.eq(q.field('type'), 'medialister_sync'))
+      .order('desc')
+      .take(1)
+    return logs[0] ?? null
   }
 })
 
@@ -229,12 +233,9 @@ export const listPaginated = query({
 export const listNeedingCheck = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, { limit = 100 }) => {
-    const cutoff = Date.now() - 1000 * 60 * 60 * 24 // 24h
-    const unknown = await ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Unknown')).take(limit)
-    if (unknown.length >= limit) return unknown
-    const stale = await ctx.db.query('sites').withIndex('by_last_checked', q => q.lt('lastCheckedAt', cutoff))
-      .take(limit - unknown.length)
-    return [...unknown, ...stale]
+    return ctx.db.query('sites')
+      .filter(q => q.eq(q.field('status'), 'Unknown'))
+      .take(limit)
   }
 })
 
