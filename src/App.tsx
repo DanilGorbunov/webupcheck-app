@@ -60,7 +60,16 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar current={selectedSite ? 'sites' : page} onNav={p => { setPage(p); setSelectedSite(null) }} />
+      <Sidebar
+        current={selectedSite ? 'sites' : page}
+        onNav={p => { setPage(p); setSelectedSite(null) }}
+        syncing={syncing}
+        syncProgress={syncProgress}
+        syncTotal={syncTotal}
+        healthRunning={healthRunning}
+        healthChecked={healthChecked}
+        healthTotal={healthTotal}
+      />
 
       <div style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
         {loading && sites.length === 0 && !error && (
@@ -74,14 +83,6 @@ export default function App() {
         {sites.length > 0 && renderContent()}
       </div>
 
-      <SyncProgress
-        syncing={syncing}
-        syncProgress={syncProgress}
-        syncTotal={syncTotal}
-        healthChecked={healthChecked}
-        healthTotal={healthTotal}
-        healthRunning={healthRunning}
-      />
     </div>
   )
 }

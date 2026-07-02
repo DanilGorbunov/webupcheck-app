@@ -5,6 +5,12 @@ interface Props {
   current: Page
   onNav: (p: Page) => void
   stats?: { active: number; warning: number; issues: number }
+  syncing?: boolean
+  syncProgress?: number
+  syncTotal?: number
+  healthRunning?: boolean
+  healthChecked?: number
+  healthTotal?: number
 }
 
 const navItems: { id: Page; label: string; icon: ReactNode }[] = [
@@ -40,7 +46,10 @@ const navItems: { id: Page; label: string; icon: ReactNode }[] = [
   },
 ]
 
-export function Sidebar({ current, onNav, stats }: Props) {
+export function Sidebar({ current, onNav, stats, syncing, syncProgress = 0, syncTotal = 0, healthRunning, healthChecked = 0, healthTotal = 0 }: Props) {
+  const syncPct = syncTotal ? Math.round((syncProgress / syncTotal) * 100) : 0
+  const healthPct = healthTotal ? Math.round((healthChecked / healthTotal) * 100) : 0
+
   return (
     <div style={{ width: 232, minWidth: 232, background: '#0F172A', display: 'flex', flexDirection: 'column', height: '100vh', zIndex: 10 }}>
       {/* Logo */}
@@ -82,24 +91,62 @@ export function Sidebar({ current, onNav, stats }: Props) {
         })}
       </nav>
 
-      {/* Network status */}
-      <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <div style={{ fontSize: 10, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Network Status</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#94A3B8' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16A34A', flexShrink: 0, boxShadow: '0 0 5px rgba(22,163,74,0.6)' }} />
-            {stats?.active?.toLocaleString() ?? '—'} Active
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#94A3B8' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#D97706', flexShrink: 0 }} />
-            {stats?.warning?.toLocaleString() ?? '—'} Warning
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#94A3B8' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#DC2626', flexShrink: 0 }} />
-            {stats?.issues?.toLocaleString() ?? '—'} Issues
+      {/* Sync progress — shown at bottom when active */}
+      {(syncing || healthRunning) && (
+        <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {syncing && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>Syncing Medialister</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#2563EB' }}>{syncPct}%</span>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 4, overflow: 'hidden', marginBottom: 3 }}>
+                <div style={{ background: '#2563EB', height: '100%', width: `${syncPct}%`, borderRadius: 3, transition: 'width 0.3s ease' }} />
+              </div>
+              <div style={{ fontSize: 10, color: '#334155' }}>Page {syncProgress} of {syncTotal} · {(syncProgress * 100).toLocaleString()} sites</div>
+            </div>
+          )}
+
+          {healthRunning && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#16A34A', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>Checking sites</span>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#16A34A' }}>{healthPct}%</span>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 4, overflow: 'hidden', marginBottom: 3 }}>
+                <div style={{ background: '#16A34A', height: '100%', width: `${healthPct}%`, borderRadius: 3, transition: 'width 0.3s ease' }} />
+              </div>
+              <div style={{ fontSize: 10, color: '#334155' }}>{healthChecked.toLocaleString()} / {healthTotal.toLocaleString()} checked</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Network status — shown when not syncing */}
+      {!syncing && !healthRunning && (
+        <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Network Status</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#94A3B8' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16A34A', flexShrink: 0, boxShadow: '0 0 5px rgba(22,163,74,0.6)' }} />
+              {stats?.active?.toLocaleString() ?? '—'} Active
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#94A3B8' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#D97706', flexShrink: 0 }} />
+              {stats?.warning?.toLocaleString() ?? '—'} Warning
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#94A3B8' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#DC2626', flexShrink: 0 }} />
+              {stats?.issues?.toLocaleString() ?? '—'} Issues
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
   )
 }
