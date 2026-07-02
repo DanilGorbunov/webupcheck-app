@@ -10,7 +10,6 @@ type DbAlert = any
 type ConvexId = any
 
 const listAlertsFn   = makeFunctionReference<'query',    { dismissed?: boolean }, DbAlert[]>('sites:listAlerts')
-const countAlertsFn  = makeFunctionReference<'query',    { dismissed?: boolean }, number>('sites:countAlerts')
 const dismissAlertFn = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
 const dismissAllFn   = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
 
@@ -64,7 +63,7 @@ export function AlertsPage({ onViewSite }: Props) {
 
   const activeAlerts    = useQuery(listAlertsFn, { dismissed: false }) ?? []
   const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true })  ?? []
-  const undismissedCount = useQuery(countAlertsFn, { dismissed: false }) ?? 0
+  const undismissedCount = activeAlerts.length
   const dismissAlert    = useMutation(dismissAlertFn)
   const dismissAll      = useMutation(dismissAllFn)
 
