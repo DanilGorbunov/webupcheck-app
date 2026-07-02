@@ -398,11 +398,8 @@ export const listPaginated = query({
 export const listNeedingCheck = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, { limit = 100 }) => {
-    // Prioritize high DR sites first using by_dr index
     return ctx.db.query('sites')
-      .withIndex('by_dr')
-      .order('desc')
-      .filter(q => q.eq(q.field('status'), 'Unknown'))
+      .withIndex('by_status', q => q.eq('status', 'Unknown'))
       .take(limit)
   }
 })
