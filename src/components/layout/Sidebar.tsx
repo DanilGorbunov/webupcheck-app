@@ -94,7 +94,7 @@ export function Sidebar({ current, onNav, stats, syncing, syncProgress = 0, sync
                   fontSize: 10, fontWeight: 700, lineHeight: 1,
                   padding: '2px 6px', borderRadius: 10, minWidth: 18, textAlign: 'center',
                 }}>
-                  {badge > 99 ? '99+' : badge}
+                  {badge}
                 </span>
               )}
             </button>
