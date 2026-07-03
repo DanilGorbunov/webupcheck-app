@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery, useMutation, useAction } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -9,9 +9,10 @@ type DbAlert = any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ConvexId = any
 
-const listAlertsFn   = makeFunctionReference<'query',    { dismissed?: boolean; limit?: number }, DbAlert[]>('sites:listAlerts')
-const dismissAlertFn = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
-const dismissAllFn   = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
+const listAlertsFn     = makeFunctionReference<'query',    { dismissed?: boolean; limit?: number }, DbAlert[]>('sites:listAlerts')
+const dismissAlertFn   = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
+const dismissAllFn     = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
+const reverifyAlertsFn = makeFunctionReference<'action',   Record<string, never>, { dismissed: number; stillDead: number; total: number }>('checker:reverifyAlerts')
 
 interface Props { onViewSite: (s: DbSite) => void }
 
@@ -59,15 +60,29 @@ function isDead(a: DbAlert): boolean {
 
 export function AlertsPage({ onViewSite }: Props) {
   const [tab, setTab]           = useState<Tab>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [httpFilter, setHttpFilter] = useState<string | null>(null)
   const [activeLimit, setActiveLimit]       = useState(500)
   const [dismissedLimit, setDismissedLimit] = useState(500)
+  const [reverifying, setReverifying]       = useState(false)
+  const [reverifyResult, setReverifyResult] = useState<{ dismissed: number; stillDead: number; total: number } | null>(null)
 
   const activeAlerts    = useQuery(listAlertsFn, { dismissed: false, limit: activeLimit }) ?? []
   const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true,  limit: dismissedLimit }) ?? []
   const undismissedCount = activeAlerts.length
   const dismissAlert    = useMutation(dismissAlertFn)
   const dismissAll      = useMutation(dismissAllFn)
+  const reverifyAlerts  = useAction(reverifyAlertsFn)
+
+  async function handleReverify() {
+    setReverifying(true)
+    setReverifyResult(null)
+    try {
+      const result = await reverifyAlerts({})
+      setReverifyResult(result)
+    } catch { /* ignore */ }
+    setReverifying(false)
+  }
 
   const baseAlerts: DbAlert[] = tab === 'dismissed' ? dismissedAlerts : activeAlerts
 
@@ -79,6 +94,11 @@ export function AlertsPage({ onViewSite }: Props) {
     if (tab === 'warning')  { if (a.severity !== 'warning') return false }
     // HTTP code filter
     if (httpFilter) { if (!msg.includes(httpFilter)) return false }
+    // Search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      if (!a.domain?.toLowerCase().includes(q) && !msg.includes(q)) return false
+    }
     return true
   })
 
@@ -110,12 +130,29 @@ export function AlertsPage({ onViewSite }: Props) {
           </p>
         </div>
         {undismissedCount > 0 && tab !== 'dismissed' && (
-          <button
-            onClick={() => dismissAll({})}
-            style={{ padding: '7px 14px', background: 'white', color: '#6B7280', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            Dismiss All ({undismissedCount})
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {reverifyResult && (
+              <span style={{ fontSize: 12, color: '#16A34A', fontWeight: 500 }}>
+                ✓ {reverifyResult.dismissed} false positives removed · {reverifyResult.stillDead} confirmed dead
+              </span>
+            )}
+            <button
+              onClick={handleReverify}
+              disabled={reverifying}
+              style={{ padding: '7px 14px', background: reverifying ? '#F1F5F9' : '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: reverifying ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              {reverifying
+                ? <><span style={{ width: 12, height: 12, border: '2px solid #BFDBFE', borderTopColor: '#2563EB', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} /> Re-verifying…</>
+                : '🔄 Re-verify All'
+              }
+            </button>
+            <button
+              onClick={() => dismissAll({})}
+              style={{ padding: '7px 14px', background: 'white', color: '#6B7280', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Dismiss All ({undismissedCount})
+            </button>
+          </div>
         )}
       </div>
 
@@ -136,6 +173,23 @@ export function AlertsPage({ onViewSite }: Props) {
         <button style={TAB_STYLE('dismissed')} onClick={() => setTab('dismissed')}>
           Dismissed
         </button>
+      </div>
+
+      {/* Search */}
+      <div style={{ position: 'relative', marginBottom: 14 }}>
+        <svg style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search by domain or message…"
+          style={{ width: '100%', padding: '9px 12px 9px 34px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13.5, outline: 'none', fontFamily: 'inherit', color: '#1E293B', background: 'white', boxSizing: 'border-box' }}
+          onFocus={e => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.08)' }}
+          onBlur={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = 'none' }}
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: 16, lineHeight: 1, padding: 2 }}>✕</button>
+        )}
       </div>
 
       {/* HTTP Error Code Filters */}
@@ -230,7 +284,7 @@ export function AlertsPage({ onViewSite }: Props) {
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{alert.domain}</span>
+                    <a href={`https://${alert.domain}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', textDecoration: 'none' }} onMouseEnter={e => (e.currentTarget.style.textDecoration='underline')} onMouseLeave={e => (e.currentTarget.style.textDecoration='none')}>{alert.domain}</a>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: st.labelBg, color: st.labelColor }}>
                       {dead ? 'DEAD' : st.label}
                     </span>
@@ -252,14 +306,6 @@ export function AlertsPage({ onViewSite }: Props) {
                   >
                     View
                   </button>
-                  <a
-                    href={`https://${alert.domain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ padding: '5px 10px', fontSize: 12, color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: 5, background: '#EFF6FF', textDecoration: 'none', fontWeight: 500 }}
-                  >
-                    Open →
-                  </a>
                   {!alert.dismissed && (
                     <button
                       onClick={() => dismissAlert({ alertId: alert._id })}
