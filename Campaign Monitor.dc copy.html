@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',-apple-system,system-ui,sans-serif}::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden;font-family:'Inter',-apple-system,system-ui,sans-serif;background:#F8FAFC">
+
+  <!-- Sidebar -->
+  <div style="width:220px;min-width:220px;background:#0F172A;display:flex;flex-direction:column;height:100vh">
+    <div style="padding:16px 14px 13px;border-bottom:1px solid rgba(255,255,255,0.07)">
+      <a href="Landing%20Page.dc.html" style="display:flex;align-items:center;gap:9px;text-decoration:none">
+        <div style="width:30px;height:30px;background:linear-gradient(135deg,#2563EB,#1D4ED8);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#F1F5F9">PRNEWS.IO</div>
+          <div style="font-size:10px;color:#475569;font-weight:500;margin-top:1px">Campaign Monitor</div>
+        </div>
+      </a>
+    </div>
+    <nav style="padding:10px 8px;flex:1;display:flex;flex-direction:column;gap:2px">
+      <a href="User%20Dashboard.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#94A3B8;font-weight:400;text-decoration:none" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        My Sites
+      </a>
+      <a href="User%20Dashboard.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#94A3B8;font-weight:400;text-decoration:none" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        Alerts
+      </a>
+      <a href="Pre-Purchase%20Checker.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#94A3B8;font-weight:400;text-decoration:none" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        Bulk Check
+      </a>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#93C5FD;font-weight:600;background:rgba(37,99,235,0.22)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        Campaign Monitor
+      </div>
+      <a href="Settings.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#94A3B8;font-weight:400;text-decoration:none" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Settings
+      </a>
+    </nav>
+    <div style="padding:14px;border-top:1px solid rgba(255,255,255,0.07)">
+      <div style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Network Status</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94A3B8"><span style="width:6px;height:6px;border-radius:50%;background:#16A34A;flex-shrink:0"></span>39 sites healthy</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94A3B8"><span style="width:6px;height:6px;border-radius:50%;background:#D97706;flex-shrink:0"></span>6 sites warning</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#94A3B8"><span style="width:6px;height:6px;border-radius:50%;background:#DC2626;flex-shrink:0"></span>3 sites down</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+
+    <!-- Campaign LIST -->
+    <sc-if value="{{ isOnList }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:26px 28px;background:#F8FAFC;min-height:100%">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px">
+          <div>
+            <h1 style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.4px">Campaigns</h1>
+            <p style="font-size:12.5px;color:#64748B;margin-top:3px">Track placement health across all your PR campaigns</p>
+          </div>
+          <button onClick="{{ openNewCampaign }}" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New Campaign
+          </button>
+        </div>
+
+        <!-- Campaign cards -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">
+          <sc-for list="{{ campaigns }}" as="camp" hint-placeholder-count="4">
+            <div onClick="{{ camp.openDetail }}" style="background:white;border:1px solid #E2E8F0;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);cursor:pointer;transition:box-shadow 0.15s" style-hover="box-shadow:0 4px 14px rgba(0,0,0,0.08);border-color:#BFDBFE">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+                <div>
+                  <div style="font-size:14.5px;font-weight:700;color:#0F172A;margin-bottom:3px">{{ camp.name }}</div>
+                  <div style="font-size:12px;color:#6B7280">{{ camp.sites }} sites · Created {{ camp.created }}</div>
+                </div>
+                <div style="{{ camp.statusDotStyle }}"></div>
+              </div>
+              <!-- Health bar -->
+              <div style="display:flex;gap:3px;margin-bottom:12px">
+                <div style="flex:{{ camp.healthy }};background:#16A34A;height:5px;border-radius:3px 0 0 3px"></div>
+                <div style="flex:{{ camp.warning }};background:#D97706;height:5px"></div>
+                <div style="flex:{{ camp.issues }};background:#DC2626;height:5px;border-radius:0 3px 3px 0"></div>
+              </div>
+              <div style="display:flex;gap:14px">
+                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6B7280"><span style="width:8px;height:8px;border-radius:50%;background:#16A34A;display:inline-block"></span>{{ camp.healthy }} healthy</div>
+                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6B7280"><span style="width:8px;height:8px;border-radius:50%;background:#D97706;display:inline-block"></span>{{ camp.warning }} warning</div>
+                <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6B7280"><span style="width:8px;height:8px;border-radius:50%;background:#DC2626;display:inline-block"></span>{{ camp.issues }} issues</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- Campaign DETAIL -->
+    <sc-if value="{{ isOnDetail }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:26px 28px;background:#F8FAFC;min-height:100%">
+        <button onClick="{{ backToList }}" style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#6B7280;background:none;border:none;cursor:pointer;padding:0;margin-bottom:14px;font-family:inherit" style-hover="color:#2563EB">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          Back to Campaigns
+        </button>
+
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
+          <div>
+            <h1 style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.4px;margin-bottom:5px">{{ detailName }}</h1>
+            <div style="display:flex;align-items:center;gap:14px;font-size:12.5px;color:#6B7280">
+              <span>{{ detailSites }} sites tracked</span>
+              <span style="color:#D1D5DB">·</span>
+              <span>Jan 15 – Jun 30, 2026</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button style="padding:7px 14px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#F9FAFB">Export Health Report</button>
+          </div>
+        </div>
+
+        <!-- Stats bar -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+            <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Healthy</div>
+            <div style="font-size:24px;font-weight:700;color:#16A34A;letter-spacing:-0.5px">{{ detailHealthy }}</div>
+          </div>
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+            <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Warning</div>
+            <div style="font-size:24px;font-weight:700;color:#D97706;letter-spacing:-0.5px">{{ detailWarning }}</div>
+          </div>
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+            <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Issues</div>
+            <div style="font-size:24px;font-weight:700;color:#DC2626;letter-spacing:-0.5px">{{ detailIssues }}</div>
+          </div>
+        </div>
+
+        <!-- Sites table -->
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#F8FAFC">
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Domain</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Placement Date</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Health</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Status</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Alert</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ detailSiteRows }}" as="row" hint-placeholder-count="6">
+                <tr style="border-top:1px solid #F1F5F9" style-hover="background:#F8FAFC">
+                  <td style="padding:11px 16px">
+                    <div style="font-size:13px;font-weight:600;color:#0F172A">{{ row.domain }}</div>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:1px">{{ row.placementUrl }}</div>
+                  </td>
+                  <td style="padding:11px 16px;font-size:12.5px;color:#374151">{{ row.placementDate }}</td>
+                  <td style="padding:11px 16px">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="font-size:14px;font-weight:700;color:{{ row.hc }}">{{ row.score }}</span>
+                      <div style="width:44px;background:#E2E8F0;height:4px;border-radius:2px;overflow:hidden">
+                        <div style="{{ row.barStyle }}"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="padding:11px 16px">
+                    <span style="{{ row.pillStyle }}">{{ row.status }}</span>
+                  </td>
+                  <td style="padding:11px 16px;font-size:12px;color:{{ row.alertColor }}">{{ row.alert }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- New Campaign Modal -->
+    <sc-if value="{{ showNewCampaign }}" hint-placeholder-val="{{ false }}">
+      <div style="position:fixed;inset:0;background:rgba(15,23,42,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px)">
+        <div style="background:white;border-radius:12px;width:440px;max-width:95vw;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.18)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <div style="font-size:16px;font-weight:700;color:#0F172A">New Campaign</div>
+            <button onClick="{{ closeNewCampaign }}" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;background:#F1F5F9;border-radius:6px;cursor:pointer;color:#6B7280;font-family:inherit" style-hover="background:#E2E8F0">✕</button>
+          </div>
+          <label style="display:block;font-size:12.5px;font-weight:600;color:#374151;margin-bottom:5px">Campaign name</label>
+          <input type="text" placeholder="e.g. Q3 2026 Outreach" style="width:100%;padding:9px 12px;border:1px solid #E2E8F0;border-radius:7px;font-size:14px;outline:none;font-family:inherit;color:#1E293B;margin-bottom:14px" style-focus="border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,0.08)">
+          <label style="display:block;font-size:12.5px;font-weight:600;color:#374151;margin-bottom:5px">Date range</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
+            <input type="date" style="padding:9px 12px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;outline:none;font-family:inherit" style-focus="border-color:#2563EB">
+            <input type="date" style="padding:9px 12px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;outline:none;font-family:inherit" style-focus="border-color:#2563EB">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button onClick="{{ closeNewCampaign }}" style="padding:8px 16px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>
+            <button onClick="{{ closeNewCampaign }}" style="padding:8px 20px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">Create Campaign</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { view: 'list', selectedCampaign: null, showNewCampaign: false };
+
+  CAMPAIGNS = [
+    { id:1, name:'Q1 2026 Outreach',         sites:24, healthy:21, warning:2, issues:1, created:'Jan 15, 2026' },
+    { id:2, name:'TechCrunch Placements',     sites:8,  healthy:8,  warning:0, issues:0, created:'Feb 3, 2026' },
+    { id:3, name:'German Market Q2',          sites:12, healthy:9,  warning:2, issues:1, created:'Mar 20, 2026' },
+    { id:4, name:'Product Launch Campaign',   sites:6,  healthy:5,  warning:1, issues:0, created:'Jun 1, 2026' },
+  ];
+
+  DETAIL_SITES = [
+    { domain:'techcrunch.com',       placementDate:'Jan 18, 2026', placementUrl:'techcrunch.com/startup-funding', score:94, status:'Active',      alert:'—' },
+    { domain:'forbes.com',           placementDate:'Jan 22, 2026', placementUrl:'forbes.com/tech-roundup',        score:91, status:'Active',      alert:'—' },
+    { domain:'mediablog.fr',         placementDate:'Feb 5, 2026',  placementUrl:'mediablog.fr/tendances',         score:88, status:'Active',      alert:'—' },
+    { domain:'gadgetreview.jp',      placementDate:'Feb 12, 2026', placementUrl:'gadgetreview.jp/news/2026',      score:82, status:'Active',      alert:'—' },
+    { domain:'oldnews.co.uk',        placementDate:'Feb 20, 2026', placementUrl:'oldnews.co.uk/pr-wire',          score:34, status:'Warning',     alert:'⚠️ No updates in 91 days' },
+    { domain:'ssl-expiring.com',     placementDate:'Mar 1, 2026',  placementUrl:'ssl-expiring.com/guest-post',   score:61, status:'Warning',     alert:'⚠️ SSL expires in 7 days' },
+    { domain:'unreachable-portal.io',placementDate:'Mar 10, 2026', placementUrl:'unreachable-portal.io/news',    score:12, status:'Unreachable', alert:'🔴 Down since Mar 22' },
+  ];
+
+  hc(score) { return score >= 80 ? '#16A34A' : score >= 50 ? '#D97706' : '#DC2626'; }
+
+  renderVals() {
+    const { view, selectedCampaign, showNewCampaign } = this.state;
+    const camp = this.CAMPAIGNS.find(c => c.id === selectedCampaign) || this.CAMPAIGNS[0];
+
+    const campaigns = this.CAMPAIGNS.map(c => ({
+      ...c,
+      statusDotStyle: {
+        width:'10px', height:'10px', borderRadius:'50%', flexShrink:0, marginTop:'4px',
+        background: c.issues > 0 ? '#DC2626' : c.warning > 0 ? '#D97706' : '#16A34A',
+        boxShadow: c.issues > 0 ? '0 0 5px rgba(220,38,38,0.4)' : c.warning > 0 ? '0 0 5px rgba(217,119,6,0.4)' : '0 0 5px rgba(22,163,74,0.4)'
+      },
+      openDetail: () => this.setState({ view:'detail', selectedCampaign: c.id }),
+    }));
+
+    const SC = {
+      Active:      { bg:'#dcfce7', color:'#15803d' },
+      Warning:     { bg:'#fef9c3', color:'#92400e' },
+      Unreachable: { bg:'#fee2e2', color:'#b91c1c' },
+    };
+    const detailSiteRows = this.DETAIL_SITES.map(s => {
+      const sc = SC[s.status] || SC.Active;
+      const h = this.hc(s.score);
+      return {
+        ...s,
+        hc: h,
+        barStyle: { background:h, height:'100%', borderRadius:'2px', width:`${s.score}%` },
+        pillStyle: { display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:'5px', fontSize:'11px', fontWeight:600, background:sc.bg, color:sc.color },
+        alertColor: s.alert.includes('🔴') ? '#DC2626' : s.alert.includes('⚠️') ? '#D97706' : '#94A3B8',
+      };
+    });
+
+    return {
+      isOnList: view === 'list',
+      isOnDetail: view === 'detail',
+      campaigns,
+      backToList: () => this.setState({ view:'list' }),
+      showNewCampaign,
+      openNewCampaign: () => this.setState({ showNewCampaign:true }),
+      closeNewCampaign: () => this.setState({ showNewCampaign:false }),
+      detailName: camp.name,
+      detailSites: camp.sites,
+      detailHealthy: camp.healthy,
+      detailWarning: camp.warning,
+      detailIssues: camp.issues,
+      detailSiteRows,
+    };
+  }
+}
+</script>
+</body>
+</html>

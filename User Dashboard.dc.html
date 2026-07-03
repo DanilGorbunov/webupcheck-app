@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',-apple-system,system-ui,sans-serif}::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden;font-family:'Inter',-apple-system,system-ui,sans-serif;background:#F8FAFC">
+
+  <!-- Sidebar -->
+  <div style="width:220px;min-width:220px;background:#0F172A;display:flex;flex-direction:column;height:100vh">
+    <div style="padding:16px 14px 13px;border-bottom:1px solid rgba(255,255,255,0.07)">
+      <a href="Landing%20Page.dc.html" style="display:flex;align-items:center;gap:9px;text-decoration:none">
+        <div style="width:30px;height:30px;background:linear-gradient(135deg,#2563EB,#1D4ED8);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#F1F5F9;letter-spacing:-0.2px">PRNEWS.IO</div>
+          <div style="font-size:10px;color:#475569;font-weight:500;margin-top:1px">Site Monitor</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Plan badge -->
+    <div style="padding:10px 12px 8px;border-bottom:1px solid rgba(255,255,255,0.07)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(37,99,235,0.25);color:#93C5FD;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">PRO</span>
+        <span style="font-size:11px;color:#475569">12 / 200 sites</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.08);height:3px;border-radius:2px;margin-top:8px;overflow:hidden">
+        <div style="background:#2563EB;height:100%;width:6%;border-radius:2px"></div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav style="padding:10px 8px;flex:1;display:flex;flex-direction:column;gap:2px">
+      <button onClick="{{ navToSites }}" style="{{ navSitesStyle }}" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        My Sites
+      </button>
+      <button onClick="{{ navToAlerts }}" style="{{ navAlertsStyle }}" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        Alerts
+        <span style="margin-left:auto;background:rgba(220,38,38,0.25);color:#FCA5A5;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px">2</span>
+      </button>
+      <a href="Pre-Purchase%20Checker.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#94A3B8;font-weight:400;text-decoration:none" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        Bulk Check
+      </a>
+      <a href="Campaign%20Monitor.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#94A3B8;font-weight:400;text-decoration:none" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        Campaign Monitor
+      </a>
+      <a href="Settings.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:#94A3B8;font-weight:400;text-decoration:none" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Settings
+      </a>
+    </nav>
+
+    <!-- Upgrade CTA -->
+    <div style="padding:14px;border-top:1px solid rgba(255,255,255,0.07)">
+      <div style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.25);border-radius:8px;padding:12px">
+        <div style="font-size:11.5px;font-weight:600;color:#93C5FD;margin-bottom:4px">Upgrade to Agency</div>
+        <div style="font-size:11px;color:#475569;margin-bottom:10px;line-height:1.4">2,000 sites, 1h checks, white-label reports</div>
+        <button style="width:100%;padding:6px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">Upgrade →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+
+    <!-- My Sites -->
+    <sc-if value="{{ isOnSites }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:26px 28px;background:#F8FAFC;min-height:100%">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px">
+          <div>
+            <h1 style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.4px">My Sites</h1>
+            <p style="font-size:12.5px;color:#64748B;margin-top:3px">12 of 200 sites monitored · PRO plan</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <a href="Pre-Purchase%20Checker.dc.html" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:500;text-decoration:none" style-hover="background:#F9FAFB">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              Quick Check
+            </a>
+            <button onClick="{{ openAddModal }}" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add Domain
+            </button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#F8FAFC">
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Domain</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Health Score</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Status</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">SSL</th>
+                <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Last Check</th>
+                <th style="padding:10px 16px;text-align:right;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ sites }}" as="site" hint-placeholder-count="6">
+                <tr style="border-top:1px solid #F1F5F9;cursor:pointer" style-hover="background:#F0F7FF">
+                  <td style="padding:12px 16px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div style="width:22px;height:22px;background:#EFF6FF;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                      </div>
+                      <span style="font-size:13px;font-weight:600;color:#0F172A">{{ site.domain }}</span>
+                    </div>
+                  </td>
+                  <td style="padding:12px 16px">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <span style="font-size:15px;font-weight:700;color:{{ site.healthColor }};min-width:24px">{{ site.score }}</span>
+                      <div style="width:60px;background:#E2E8F0;height:4px;border-radius:2px;overflow:hidden">
+                        <div style="{{ site.barStyle }}"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="padding:12px 16px">
+                    <span style="{{ site.pillStyle }}">
+                      <span style="width:5px;height:5px;border-radius:50%;background:{{ site.dotColor }};display:inline-block;flex-shrink:0"></span>
+                      {{ site.status }}
+                    </span>
+                  </td>
+                  <td style="padding:12px 16px">
+                    <span style="font-size:12px;font-weight:600;color:{{ site.sslColor }}">{{ site.sslText }}</span>
+                  </td>
+                  <td style="padding:12px 16px">
+                    <span style="font-size:12px;color:#6B7280">{{ site.lastCheck }}</span>
+                  </td>
+                  <td style="padding:12px 16px;text-align:right">
+                    <div style="display:flex;gap:6px;justify-content:flex-end">
+                      <a href="Pre-Purchase%20Checker.dc.html" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:5px;background:white;font-size:12px;color:#374151;cursor:pointer;font-weight:500;text-decoration:none" style-hover="background:#F8FAFC">Details</a>
+                      <button onClick="{{ site.removeAction }}" style="padding:4px 10px;border:1px solid #FEE2E2;border-radius:5px;background:white;font-size:12px;color:#DC2626;cursor:pointer;font-family:inherit" style-hover="background:#FEF2F2">Remove</button>
+                    </div>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <div style="padding:10px 16px;background:#FAFAFA;border-top:1px solid #F1F5F9;font-size:12px;color:#6B7280">
+            Showing {{ siteCount }} of 12 sites monitored
+          </div>
+        </div>
+
+      </div>
+    </sc-if>
+
+    <!-- Alerts tab -->
+    <sc-if value="{{ isOnAlerts }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:26px 28px;background:#F8FAFC;min-height:100%">
+        <h1 style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.4px;margin-bottom:18px">Alerts</h1>
+        <div style="position:relative;margin-bottom:16px">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px;pointer-events:none">🔍</span>
+          <input value="{{ alertSearch }}" onInput="{{ onAlertSearchInput }}" type="text" placeholder="Search alerts..." style="width:100%;padding:9px 12px 9px 36px;border:1px solid #E2E8F0;border-radius:8px;font-size:13.5px;outline:none;font-family:inherit;color:#1E293B;background:white;box-sizing:border-box" style-focus="border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,0.08)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for values="{{ filteredAlerts }}" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-left:3px solid {{ item.borderColor }};background:{{ item.bg }};border-radius:0 8px 8px 0">
+              <span style="font-size:18px">{{ item.icon }}</span>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:#1E293B;margin-bottom:2px">{{ item.domain }}</div>
+                <div style="font-size:12.5px;color:#374151">{{ item.message }}</div>
+              </div>
+              <span style="font-size:11.5px;color:#94A3B8">{{ item.time }}</span>
+              <button style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:5px;background:white;font-size:12px;color:#6B7280;cursor:pointer;font-family:inherit" style-hover="background:#F8FAFC">Dismiss</button>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noAlertsFound }}" hint-placeholder-val="{{ false }}">
+            <div style="text-align:center;padding:40px 20px;color:#94A3B8;font-size:13.5px">No alerts match your search</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <!-- Add Domain Modal -->
+  <sc-if value="{{ showAddModal }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(15,23,42,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px)">
+      <div style="background:white;border-radius:12px;width:440px;max-width:95vw;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.18)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <div style="font-size:16px;font-weight:700;color:#0F172A">Add Domain</div>
+          <button onClick="{{ closeAddModal }}" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;background:#F1F5F9;border-radius:6px;cursor:pointer;color:#6B7280;font-family:inherit" style-hover="background:#E2E8F0">✕</button>
+        </div>
+        <label style="display:block;font-size:12.5px;font-weight:600;color:#374151;margin-bottom:6px">Domain name</label>
+        <input value="{{ addDomainQuery }}" onInput="{{ onAddDomainInput }}" type="text" placeholder="e.g. techcrunch.com" style="width:100%;padding:10px 12px;border:1px solid #E2E8F0;border-radius:7px;font-size:14px;outline:none;font-family:inherit;color:#1E293B;margin-bottom:16px" style-focus="border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,0.08)">
+        <div style="background:#F8FAFC;border-radius:8px;padding:11px 14px;border:1px solid #E2E8F0;margin-bottom:18px">
+          <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px">What we check</div>
+          <div style="font-size:12px;color:#475569;line-height:1.6">HTTP status · SSL validity · Blacklists · Content freshness · Parking detection</div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onClick="{{ closeAddModal }}" style="padding:8px 16px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>
+          <button onClick="{{ addDomain }}" style="padding:8px 20px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">Add &amp; Start Monitoring</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    page: 'sites',
+    showAddModal: false,
+    addDomainQuery: '',
+    removedIds: [],
+    alertSearch: '',
+  };
+
+  SC = {
+    Active:      { bg:'#dcfce7', color:'#15803d', dot:'#16A34A' },
+    Warning:     { bg:'#fef9c3', color:'#92400e', dot:'#D97706' },
+    Unreachable: { bg:'#fee2e2', color:'#b91c1c', dot:'#DC2626' },
+  };
+
+  ALL_SITES = [
+    { id:1, domain:'techcrunch.com',   score:94, status:'Active',      ssl:true,  sslDays:187, lastCheck:'2h ago' },
+    { id:2, domain:'forbes.com',       score:91, status:'Active',      ssl:true,  sslDays:204, lastCheck:'2h ago' },
+    { id:3, domain:'mediablog.fr',     score:88, status:'Active',      ssl:true,  sslDays:155, lastCheck:'2h ago' },
+    { id:4, domain:'gadgetreview.jp',  score:82, status:'Active',      ssl:true,  sslDays:67,  lastCheck:'2h ago' },
+    { id:5, domain:'techblog.es',      score:79, status:'Active',      ssl:true,  sslDays:133, lastCheck:'2h ago' },
+    { id:6, domain:'oldnews.co.uk',    score:34, status:'Warning',     ssl:true,  sslDays:12,  lastCheck:'2h ago' },
+    { id:7, domain:'ssl-expiring.com', score:61, status:'Warning',     ssl:true,  sslDays:7,   lastCheck:'3h ago' },
+    { id:8, domain:'mediaportal.de',   score:85, status:'Active',      ssl:true,  sslDays:92,  lastCheck:'2h ago' },
+    { id:9, domain:'newsweek.au',      score:77, status:'Active',      ssl:true,  sslDays:110, lastCheck:'2h ago' },
+    { id:10, domain:'techreport.ca',   score:69, status:'Active',      ssl:true,  sslDays:44,  lastCheck:'2h ago' },
+    { id:11, domain:'startup.in',      score:88, status:'Active',      ssl:true,  sslDays:200, lastCheck:'2h ago' },
+    { id:12, domain:'sitedead.io',     score:12, status:'Unreachable', ssl:false, sslDays:0,   lastCheck:'6h ago' },
+  ];
+
+  healthColor(score) {
+    if (score >= 80) return '#16A34A';
+    if (score >= 50) return '#D97706';
+    return '#DC2626';
+  }
+
+  renderVals() {
+    const { page, showAddModal, addDomainQuery, removedIds, alertSearch } = this.state;
+    const nb = { display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'13px', border:'none', width:'100%', textAlign:'left', fontFamily:'inherit', fontWeight:400 };
+    const ni = p => ({ ...nb, background: page===p ? 'rgba(37,99,235,0.22)' : 'transparent', color: page===p ? '#93C5FD' : '#94A3B8', fontWeight: page===p ? 600 : 400 });
+
+    const visibleSites = this.ALL_SITES.filter(s => !removedIds.includes(s.id));
+    const sites = visibleSites.map(s => {
+      const sc = this.SC[s.status] || this.SC.Active;
+      const hc = this.healthColor(s.score);
+      return {
+        ...s,
+        healthColor: hc,
+        barStyle: { background: hc, height: '100%', borderRadius: '2px', width: `${s.score}%` },
+        pillStyle: { display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 8px', borderRadius:'6px', fontSize:'11px', fontWeight:600, background:sc.bg, color:sc.color, whiteSpace:'nowrap' },
+        dotColor: sc.dot,
+        sslText: s.ssl ? `✓ ${s.sslDays}d` : '✗',
+        sslColor: s.ssl ? (s.sslDays < 14 ? '#D97706' : '#16A34A') : '#DC2626',
+        removeAction: () => this.setState(st => ({ removedIds: [...st.removedIds, s.id] })),
+      };
+    });
+
+    return {
+      isOnSites: page === 'sites',
+      isOnAlerts: page === 'alerts',
+      navSitesStyle: ni('sites'),
+      navAlertsStyle: ni('alerts'),
+      navToSites: () => this.setState({ page:'sites' }),
+      navToAlerts: () => this.setState({ page:'alerts' }),
+      sites,
+      siteCount: sites.length,
+      showAddModal,
+      addDomainQuery,
+      alertSearch,
+      openAddModal: () => this.setState({ showAddModal: true, addDomainQuery: '' }),
+      closeAddModal: () => this.setState({ showAddModal: false }),
+      onAddDomainInput: e => this.setState({ addDomainQuery: e.target.value }),
+      addDomain: () => this.setState({ showAddModal: false }),
+      onAlertSearchInput: e => this.setState({ alertSearch: e.target.value }),
+      ...(() => {
+        const ALL_ALERTS = [
+          { domain:'ssl-expiring.com', message:'SSL certificate expires in 7 days',  time:'3h ago', icon:'⚠️', borderColor:'#D97706', bg:'#fffbeb' },
+          { domain:'oldnews.co.uk',    message:'No content updates in 91 days',       time:'1d ago', icon:'🔴', borderColor:'#DC2626', bg:'#fff5f5' },
+        ];
+        const q = alertSearch.toLowerCase();
+        const filteredAlerts = q ? ALL_ALERTS.filter(a => a.domain.toLowerCase().includes(q) || a.message.toLowerCase().includes(q)) : ALL_ALERTS;
+        return { filteredAlerts, noAlertsFound: filteredAlerts.length === 0 };
+      })(),
+    };
+  }
+}
+</script>
+</body>
+</html>

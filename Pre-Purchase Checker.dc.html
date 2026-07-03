@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',-apple-system,system-ui,sans-serif}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes slide-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}</style>
+</helmet>
+
+<div style="min-height:100vh;background:#F8FAFC;font-family:'Inter',-apple-system,system-ui,sans-serif">
+
+  <!-- Header -->
+  <header style="background:#0F172A;border-bottom:1px solid rgba(255,255,255,0.07);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:20px">
+      <a href="Landing%20Page.dc.html" style="display:flex;align-items:center;gap:9px;text-decoration:none">
+        <div style="width:28px;height:28px;background:linear-gradient(135deg,#2563EB,#1D4ED8);border-radius:6px;display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+        </div>
+        <span style="font-size:13.5px;font-weight:700;color:#F1F5F9">PRNEWS.IO</span>
+      </a>
+      <div style="width:1px;height:20px;background:rgba(255,255,255,0.12)"></div>
+      <span style="font-size:13px;font-weight:600;color:#94A3B8">Site Checker</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <a href="User%20Dashboard.dc.html" style="font-size:13px;color:#94A3B8;text-decoration:none" style-hover="color:#F1F5F9">My Sites</a>
+      <a href="User%20Dashboard.dc.html" style="font-size:12.5px;background:rgba(255,255,255,0.08);color:#CBD5E1;padding:5px 12px;border-radius:6px;text-decoration:none" style-hover="background:rgba(255,255,255,0.12)">Dashboard →</a>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div style="background:white;border-bottom:1px solid #E2E8F0;padding:0 32px">
+    <div style="display:flex;gap:0;max-width:900px;margin:0 auto">
+      <button onClick="{{ setTabSingle }}" style="{{ tabSingleStyle }}" style-hover="color:#374151">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        Single Check
+      </button>
+      <button onClick="{{ setTabBulk }}" style="{{ tabBulkStyle }}" style-hover="color:#374151">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        Bulk Check
+        <span style="font-size:10px;padding:1px 6px;background:#EFF6FF;color:#2563EB;border-radius:10px;font-weight:600">Pro</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SINGLE CHECK TAB -->
+  <sc-if value="{{ isTabSingle }}" hint-placeholder-val="{{ true }}">
+    <div style="max-width:900px;margin:0 auto;padding:40px 24px">
+
+      <!-- Input area -->
+      <div style="text-align:center;margin-bottom:36px">
+        <h1 style="font-size:28px;font-weight:800;color:#0F172A;letter-spacing:-0.6px;margin-bottom:8px">Pre-Purchase Site Check</h1>
+        <p style="font-size:15px;color:#64748B">Verify any publisher before committing your PR budget</p>
+      </div>
+
+      <div style="background:white;border:1.5px solid #E2E8F0;border-radius:12px;padding:6px 6px 6px 18px;display:flex;gap:8px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.06);margin-bottom:10px;max-width:680px;margin-left:auto;margin-right:auto" style-focus-within="border-color:#2563EB">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <input value="{{ query }}" onInput="{{ onQueryInput }}" onKeyDown="{{ onQueryKeyDown }}" type="text" placeholder="Enter domain to check, e.g. techcrunch.com" style="flex:1;border:none;outline:none;font-size:15px;color:#1E293B;font-family:inherit;background:transparent;min-width:0">
+        <button onClick="{{ doCheck }}" style="padding:10px 24px;background:#2563EB;color:white;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap" style-hover="background:#1D4ED8">Check Now</button>
+      </div>
+
+      <div style="text-align:center;font-size:12px;color:#94A3B8;margin-bottom:40px">
+        Rate limited: 100 checks/day on Pro · <a href="#" style="color:#2563EB;text-decoration:none" style-hover="text-decoration:underline">Upgrade for unlimited</a>
+      </div>
+
+      <!-- IDLE state -->
+      <sc-if value="{{ isIdle }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:680px;margin:0 auto">
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;padding:18px;text-align:center;cursor:pointer" onClick="{{ preset0 }}" style-hover="border-color:#2563EB;background:#F0F7FF">
+            <div style="font-size:13px;font-weight:600;color:#0F172A;margin-bottom:4px">techcrunch.com</div>
+            <div style="font-size:11px;color:#94A3B8">Example: Healthy site</div>
+          </div>
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;padding:18px;text-align:center;cursor:pointer" onClick="{{ preset1 }}" style-hover="border-color:#DC2626;background:#FFF5F5">
+            <div style="font-size:13px;font-weight:600;color:#0F172A;margin-bottom:4px">spamsite.net</div>
+            <div style="font-size:11px;color:#94A3B8">Example: Blacklisted</div>
+          </div>
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;padding:18px;text-align:center;cursor:pointer" onClick="{{ preset2 }}" style-hover="border-color:#D97706;background:#FFFBEB">
+            <div style="font-size:13px;font-weight:600;color:#0F172A;margin-bottom:4px">oldnews.co.uk</div>
+            <div style="font-size:11px;color:#94A3B8">Example: Stale content</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- LOADING state -->
+      <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;margin:0 auto;background:white;border:1px solid #E2E8F0;border-radius:12px;padding:32px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
+          <div style="width:44px;height:44px;border:3px solid #E2E8F0;border-top-color:#2563EB;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 20px"></div>
+          <div style="font-size:16px;font-weight:700;color:#0F172A;margin-bottom:6px">Checking {{ queryDisplay }}...</div>
+          <div style="display:flex;flex-direction:column;gap:5px;text-align:left;max-width:280px;margin:16px auto 0">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#6B7280"><span style="color:#16A34A">✓</span> HTTP status verified</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#6B7280"><span style="color:#16A34A">✓</span> SSL certificate checked</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#94A3B8">
+              <div style="width:10px;height:10px;border:1.5px solid #CBD5E1;border-top-color:#2563EB;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0"></div>
+              Checking blacklists...
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- RESULT state -->
+      <sc-if value="{{ isResult }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;margin:0 auto;animation:slide-up 0.35s ease">
+
+          <!-- Main result card -->
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);margin-bottom:14px">
+
+            <!-- Card header -->
+            <div style="{{ resultHeaderStyle }}">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                <div>
+                  <div style="font-size:20px;font-weight:800;color:#0F172A;margin-bottom:4px">{{ queryDisplay }}</div>
+                  <div style="font-size:12px;color:#64748B">Checked {{ checkTime }} · PRNEWS.IO Checker</div>
+                </div>
+                <div style="{{ badgeStyle }}">{{ badgeText }}</div>
+              </div>
+
+              <!-- Health score bar -->
+              <div style="margin-top:18px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+                  <span style="font-size:12px;font-weight:600;color:#374151">Health Score</span>
+                  <span style="font-size:20px;font-weight:800;color:{{ scoreColor }}">{{ score }}<span style="font-size:13px;font-weight:500;color:#94A3B8">/100</span></span>
+                </div>
+                <div style="background:#E2E8F0;height:8px;border-radius:4px;overflow:hidden">
+                  <div style="{{ scoreBarStyle }}"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Checks grid -->
+            <div style="padding:20px 22px;display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ checks }}" as="chk" hint-placeholder-count="7">
+                <div style="display:flex;align-items:center;gap:12px;padding:9px 12px;background:#F8FAFC;border-radius:8px">
+                  <span style="font-size:16px;width:22px;text-align:center;flex-shrink:0">{{ chk.icon }}</span>
+                  <span style="font-size:13px;font-weight:600;color:#374151;min-width:130px">{{ chk.label }}</span>
+                  <span style="font-size:13px;color:{{ chk.vc }};flex:1">{{ chk.value }}</span>
+                  <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:2px 7px;border-radius:10px;background:{{ chk.tagBg }};color:{{ chk.tagColor }}">{{ chk.tag }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:16px 22px;border-top:1px solid #F1F5F9;display:flex;gap:10px;justify-content:space-between;align-items:center;background:#FAFAFA">
+              <div style="font-size:12px;color:#94A3B8">Checked: {{ checkDate }}</div>
+              <div style="display:flex;gap:8px">
+                <button style="padding:7px 14px;background:white;color:#374151;border:1px solid #E2E8F0;border-radius:7px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#F8FAFC">Save to Campaign</button>
+                <button onClick="{{ resetCheck }}" style="padding:7px 14px;background:#2563EB;color:white;border:none;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">Check Another →</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </sc-if>
+
+  <!-- BULK CHECK TAB -->
+  <sc-if value="{{ isTabBulk }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:800px;margin:0 auto;padding:40px 24px">
+      <div style="text-align:center;margin-bottom:36px">
+        <h1 style="font-size:26px;font-weight:800;color:#0F172A;letter-spacing:-0.5px;margin-bottom:8px">Bulk Domain Check</h1>
+        <p style="font-size:14.5px;color:#64748B">Upload a CSV list — we'll check every domain and score it</p>
+      </div>
+
+      <!-- Idle / upload -->
+      <sc-if value="{{ isBulkIdle }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ startBulk }}" style="border:2px dashed #CBD5E1;border-radius:12px;padding:56px 24px;text-align:center;cursor:pointer;background:white;transition:all 0.15s" style-hover="border-color:#2563EB;background:#F0F7FF">
+          <div style="width:52px;height:52px;background:#EFF6FF;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          </div>
+          <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:6px">Drop your CSV here or <span style="color:#2563EB;text-decoration:underline">browse files</span></div>
+          <div style="font-size:12.5px;color:#94A3B8;margin-bottom:14px">One domain per row · up to 5,000 domains on Pro</div>
+          <div style="display:inline-block;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px 14px">
+            <code style="font-size:11.5px;color:#475569;font-family:ui-monospace,Menlo,monospace">techcrunch.com<br>forbes.com<br>mediablog.fr</code>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:12px">
+          <a href="#" style="font-size:12.5px;color:#2563EB;text-decoration:none" style-hover="text-decoration:underline">↓ Download sample CSV</a>
+        </div>
+      </sc-if>
+
+      <!-- Checking progress -->
+      <sc-if value="{{ isBulkChecking }}" hint-placeholder-val="{{ false }}">
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;padding:32px;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
+          <div style="text-align:center;margin-bottom:24px">
+            <div style="font-size:16px;font-weight:700;color:#0F172A;margin-bottom:4px">Checking 48 domains...</div>
+            <div style="font-size:13px;color:#6B7280">This may take a minute. Stay on this page.</div>
+          </div>
+          <div style="background:#F1F5F9;border-radius:8px;height:10px;overflow:hidden;margin-bottom:10px">
+            <div style="{{ bulkBarStyle }}"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#6B7280;margin-bottom:18px">
+            <span>{{ bulkDone }} / 48 checked</span>
+            <span style="font-weight:600;color:#2563EB">{{ bulkPct }}%</span>
+          </div>
+          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 14px;font-size:12px;color:#475569">
+            Currently checking: <strong>{{ bulkCurrentDomain }}</strong>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- Results table -->
+      <sc-if value="{{ isBulkDone }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:14px;font-weight:600;color:#0F172A">48 domains checked</div>
+          <div style="display:flex;gap:8px">
+            <button style="padding:7px 14px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#F9FAFB">Export CSV</button>
+            <button onClick="{{ resetBulk }}" style="padding:7px 14px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">Check Another List</button>
+          </div>
+        </div>
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#F8FAFC">
+                <th style="padding:9px 14px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Domain</th>
+                <th style="padding:9px 14px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Score</th>
+                <th style="padding:9px 14px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Status</th>
+                <th style="padding:9px 14px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Recommendation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ bulkResults }}" as="row" hint-placeholder-count="5">
+                <tr style="border-top:1px solid #F1F5F9" style-hover="background:#F8FAFC">
+                  <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#0F172A">{{ row.domain }}</td>
+                  <td style="padding:10px 14px">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="font-size:13.5px;font-weight:700;color:{{ row.hc }}">{{ row.score }}</span>
+                      <div style="width:44px;background:#E2E8F0;height:4px;border-radius:2px;overflow:hidden">
+                        <div style="{{ row.barStyle }}"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="padding:10px 14px">
+                    <span style="{{ row.pillStyle }}">{{ row.status }}</span>
+                  </td>
+                  <td style="padding:10px 14px">
+                    <span style="{{ row.recStyle }}">{{ row.rec }}</span>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </sc-if>
+
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    tab: 'single',
+    query: '', queryDisplay: '',
+    checkState: 'idle',
+    checkTimer: null,
+    bulkState: 'idle',
+    bulkProgress: 0,
+    bulkTimer: null,
+  };
+
+  BULK_DOMAINS = ['techcrunch.com','forbes.com','mediablog.fr','gadgetreview.jp','spamsite.net','oldnews.co.uk','businessinsider.de','ssl-expiring.com'];
+
+  getResult(domain) {
+    const lc = (domain||'').toLowerCase();
+    if (lc.includes('spam')||lc.includes('phish')) {
+      return { score:8, badgeText:'⛔ DO NOT BUY', headerBg:'#FEF2F2', badgeBg:'#DC2626', badgeColor:'white', badgeBorder:'#DC2626', scoreColor:'#DC2626', barColor:'#DC2626',
+        checks:[
+          {icon:'✅',label:'Reachable',value:'200 OK · 1.2s',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+          {icon:'❌',label:'Google Safe Browsing',value:'Flagged as malware',vc:'#DC2626',tag:'FAIL',tagBg:'#FEF2F2',tagColor:'#DC2626'},
+          {icon:'❌',label:'Spamhaus DBL',value:'Listed (spam domain)',vc:'#DC2626',tag:'FAIL',tagBg:'#FEF2F2',tagColor:'#DC2626'},
+          {icon:'✅',label:'SSL Valid',value:'Expires in 45 days',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+          {icon:'❌',label:'Parking Detection',value:'Parking page detected',vc:'#DC2626',tag:'FAIL',tagBg:'#FEF2F2',tagColor:'#DC2626'},
+          {icon:'⚠️',label:'Content Quality',value:'Low-quality detected',vc:'#D97706',tag:'WARN',tagBg:'#FFFBEB',tagColor:'#92400e'},
+          {icon:'✅',label:'MX Records',value:'Present',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        ]};
+    }
+    if (lc.includes('old')||lc.includes('ssl')||lc.includes('uk')) {
+      return { score:42, badgeText:'⚠️ PROCEED WITH CAUTION', headerBg:'#FFFBEB', badgeBg:'#FFFBEB', badgeColor:'#92400e', badgeBorder:'#FDE68A', scoreColor:'#D97706', barColor:'#D97706',
+        checks:[
+          {icon:'✅',label:'Reachable',value:'200 OK · 680ms',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+          {icon:'✅',label:'Google Safe Browsing',value:'Clean',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+          {icon:'✅',label:'Spamhaus DBL',value:'Not listed',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+          {icon:'⚠️',label:'SSL Valid',value:'Expires in 12 days',vc:'#D97706',tag:'WARN',tagBg:'#FFFBEB',tagColor:'#92400e'},
+          {icon:'✅',label:'Parking Detection',value:'No parking detected',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+          {icon:'❌',label:'Active Content',value:'No posts in 91 days',vc:'#DC2626',tag:'FAIL',tagBg:'#FEF2F2',tagColor:'#DC2626'},
+          {icon:'✅',label:'MX Records',value:'Present',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        ]};
+    }
+    return { score:94, badgeText:'✅ SAFE TO BUY', headerBg:'#F0FDF4', badgeBg:'#16A34A', badgeColor:'white', badgeBorder:'#16A34A', scoreColor:'#16A34A', barColor:'#16A34A',
+      checks:[
+        {icon:'✅',label:'Reachable',value:'200 OK · 342ms',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        {icon:'✅',label:'Google Safe Browsing',value:'Clean',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        {icon:'✅',label:'Spamhaus DBL',value:'Not listed',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        {icon:'✅',label:'SSL Valid',value:'Expires in 187 days',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        {icon:'✅',label:'Parking Detection',value:'No parking detected',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        {icon:'✅',label:'Active Content',value:'Last post 3 days ago',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+        {icon:'✅',label:'MX Records',value:'Present',vc:'#16A34A',tag:'OK',tagBg:'#F0FDF4',tagColor:'#15803d'},
+      ]};
+  }
+
+  hc(score) { return score >= 80 ? '#16A34A' : score >= 50 ? '#D97706' : '#DC2626'; }
+  rec(score) {
+    if (score >= 75) return { text:'✅ Safe to Buy', bg:'#F0FDF4', color:'#15803d' };
+    if (score >= 50) return { text:'⚠️ Caution', bg:'#FFFBEB', color:'#92400e' };
+    return { text:'⛔ Do Not Buy', bg:'#FEF2F2', color:'#DC2626' };
+  }
+
+  doCheck(domain) {
+    const q = (domain || this.state.query).trim();
+    if (!q) return;
+    if (this.state.checkTimer) clearTimeout(this.state.checkTimer);
+    this.setState({ checkState:'loading', queryDisplay: q, query: q });
+    const t = setTimeout(() => this.setState({ checkState:'result', checkTimer:null }), 1800);
+    this.setState({ checkTimer: t });
+  }
+
+  startBulk() {
+    if (this.state.bulkTimer) clearInterval(this.state.bulkTimer);
+    this.setState({ bulkState:'checking', bulkProgress:0 });
+    let p = 0;
+    const t = setInterval(() => {
+      p += Math.random() * 3 + 0.8;
+      if (p >= 100) { p = 100; clearInterval(t); this.setState({ bulkProgress:100, bulkTimer:null }); setTimeout(() => this.setState({ bulkState:'done' }), 400); }
+      else this.setState({ bulkProgress: p });
+    }, 90);
+    this.setState({ bulkTimer: t });
+  }
+
+  componentWillUnmount() {
+    if (this.state.checkTimer) clearTimeout(this.state.checkTimer);
+    if (this.state.bulkTimer) clearInterval(this.state.bulkTimer);
+  }
+
+  renderVals() {
+    const { tab, query, queryDisplay, checkState, bulkState, bulkProgress } = this.state;
+    const tabBase = { display:'flex', alignItems:'center', gap:'7px', padding:'13px 18px', background:'none', border:'none', cursor:'pointer', fontSize:'13.5px', fontFamily:'inherit', fontWeight:400 };
+    const tabAct  = { ...tabBase, color:'#2563EB', fontWeight:600, boxShadow:'inset 0 -2px 0 #2563EB' };
+    const tabIna  = { ...tabBase, color:'#6B7280' };
+
+    const r = this.getResult(queryDisplay);
+    const bulkPct = Math.round(bulkProgress);
+    const bulkDone = Math.round(bulkProgress * 0.48);
+    const domainIdx = Math.min(Math.floor(bulkProgress / 100 * this.BULK_DOMAINS.length), this.BULK_DOMAINS.length - 1);
+
+    const SCORES = [94,91,88,82,8,42,78,61];
+    const bulkResults = this.BULK_DOMAINS.map((domain, i) => {
+      const score = SCORES[i] || 70;
+      const h = this.hc(score);
+      const recR = this.rec(score);
+      const sc = score >= 80 ? {bg:'#dcfce7',color:'#15803d',dot:'#16A34A'} : score >= 50 ? {bg:'#fef9c3',color:'#92400e',dot:'#D97706'} : {bg:'#fee2e2',color:'#991b1b',dot:'#DC2626'};
+      return {
+        domain, score,
+        hc: h,
+        barStyle: { background:h, height:'100%', borderRadius:'2px', width:`${score}%` },
+        status: score >= 80 ? 'Active' : score >= 50 ? 'Warning' : 'Issues',
+        pillStyle: { display:'inline-flex', alignItems:'center', padding:'2px 7px', borderRadius:'5px', fontSize:'11px', fontWeight:600, background:sc.bg, color:sc.color },
+        rec: recR.text,
+        recStyle: { fontSize:'12px', fontWeight:600, color:recR.color, background:recR.bg, padding:'2px 8px', borderRadius:'4px', display:'inline-block' },
+      };
+    });
+
+    return {
+      tab,
+      isTabSingle: tab === 'single',
+      isTabBulk: tab === 'bulk',
+      tabSingleStyle: tab === 'single' ? tabAct : tabIna,
+      tabBulkStyle: tab === 'bulk' ? tabAct : tabIna,
+      setTabSingle: () => this.setState({ tab:'single' }),
+      setTabBulk: () => this.setState({ tab:'bulk' }),
+
+      query,
+      queryDisplay,
+      onQueryInput: e => this.setState({ query: e.target.value }),
+      onQueryKeyDown: e => { if (e.key === 'Enter') this.doCheck(); },
+      doCheck: () => this.doCheck(),
+      preset0: () => this.doCheck('techcrunch.com'),
+      preset1: () => this.doCheck('spamsite.net'),
+      preset2: () => this.doCheck('oldnews.co.uk'),
+      resetCheck: () => this.setState({ checkState:'idle', query:'', queryDisplay:'' }),
+
+      isIdle: checkState === 'idle',
+      isLoading: checkState === 'loading',
+      isResult: checkState === 'result',
+
+      score: r.score,
+      scoreColor: r.scoreColor,
+      badgeText: r.badgeText,
+      badgeStyle: { display:'inline-flex', alignItems:'center', padding:'6px 14px', background:r.badgeBg, color:r.badgeColor, borderRadius:'20px', fontSize:'13px', fontWeight:700, border:`1.5px solid ${r.badgeBorder}` },
+      resultHeaderStyle: { padding:'22px 22px 18px', background:r.headerBg, borderBottom:'1px solid #E2E8F0' },
+      scoreBarStyle: { background:r.barColor, height:'100%', borderRadius:'4px', width:`${r.score}%`, transition:'width 0.6s ease' },
+      checks: r.checks,
+      checkTime: 'just now',
+      checkDate: 'Jul 2, 2026 · 10:32 UTC',
+
+      isBulkIdle: bulkState === 'idle',
+      isBulkChecking: bulkState === 'checking',
+      isBulkDone: bulkState === 'done',
+      startBulk: () => this.startBulk(),
+      resetBulk: () => this.setState({ bulkState:'idle', bulkProgress:0 }),
+      bulkPct,
+      bulkDone,
+      bulkCurrentDomain: this.BULK_DOMAINS[domainIdx] || 'techcrunch.com',
+      bulkBarStyle: { background:'linear-gradient(90deg,#2563EB,#3B82F6)', height:'100%', borderRadius:'8px', transition:'width 0.1s linear', width:`${bulkPct}%` },
+      bulkResults,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',-apple-system,system-ui,sans-serif;background:#F8FAFC}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden;font-family:'Inter',-apple-system,system-ui,sans-serif;background:#F8FAFC;color:#1E293B">
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <div style="width:232px;min-width:232px;background:#0F172A;display:flex;flex-direction:column;height:100vh;z-index:10">
+
+    <!-- Logo -->
+    <div style="padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.07)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;background:linear-gradient(135deg,#2563EB,#1D4ED8);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#F1F5F9;letter-spacing:-0.2px">PRNEWS.IO</div>
+          <div style="font-size:10px;color:#475569;font-weight:500;margin-top:1px">Site Monitor</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav style="padding:10px 8px;flex:1;display:flex;flex-direction:column;gap:2px">
+      <button onClick="{{ navToSites }}" style="{{ navDashStyle }}" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+        Dashboard
+      </button>
+      <button onClick="{{ navToSites }}" style="{{ navSitesStyle }}" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        Sites
+        <span style="margin-left:auto;background:rgba(37,99,235,0.3);color:#93C5FD;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px">105K</span>
+      </button>
+      <button onClick="{{ navToAlerts }}" style="{{ navAlertsStyle }}" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        Alerts
+        <span style="margin-left:auto;background:rgba(220,38,38,0.25);color:#FCA5A5;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px">6</span>
+      </button>
+      <button onClick="{{ navToReports }}" style="{{ navReportsStyle }}" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        Reports
+      </button>
+      <button onClick="{{ navToSettings }}" style="{{ navSettingsStyle }}" style-hover="background:rgba(255,255,255,0.06);color:#CBD5E1">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Settings
+      </button>
+    </nav>
+
+    <!-- Network status widget -->
+    <div style="padding:14px 16px;border-top:1px solid rgba(255,255,255,0.07)">
+      <div style="font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Network Status</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#94A3B8">
+          <span style="width:7px;height:7px;border-radius:50%;background:#16A34A;flex-shrink:0;box-shadow:0 0 5px rgba(22,163,74,0.6)"></span>
+          98,240 Active
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#94A3B8">
+          <span style="width:7px;height:7px;border-radius:50%;background:#D97706;flex-shrink:0"></span>
+          3,107 Warning
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#94A3B8">
+          <span style="width:7px;height:7px;border-radius:50%;background:#DC2626;flex-shrink:0"></span>
+          740 Issues
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ MAIN CONTENT ═══════════ -->
+  <div style="flex:1;overflow:auto;min-width:0;display:flex;flex-direction:column">
+
+    <!-- ══ SITES PAGE ══ -->
+    <sc-if value="{{ isOnSites }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:26px 28px;min-height:100%;background:#F8FAFC">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px">
+          <div>
+            <h1 style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.4px">Partner Sites</h1>
+            <p style="font-size:12.5px;color:#64748B;margin-top:3px">Monitoring 105,000 publisher domains across 80+ countries</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button onClick="{{ openImport }}" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              Import CSV
+            </button>
+            <button style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#F9FAFB">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats cards -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+              <div>
+                <div style="font-size:10.5px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px">Total Sites</div>
+                <div style="font-size:26px;font-weight:700;color:#0F172A;letter-spacing:-1px;line-height:1">105,000</div>
+                <div style="font-size:11.5px;color:#16A34A;margin-top:5px;font-weight:500">+240 this week</div>
+              </div>
+              <div style="width:34px;height:34px;background:#EFF6FF;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+              <div>
+                <div style="font-size:10.5px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px">Active</div>
+                <div style="font-size:26px;font-weight:700;color:#0F172A;letter-spacing:-1px;line-height:1">98,240</div>
+                <div style="font-size:11.5px;color:#16A34A;margin-top:5px;font-weight:500">93.6% of total</div>
+              </div>
+              <div style="width:34px;height:34px;background:#F0FDF4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+              <div>
+                <div style="font-size:10.5px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px">Issues</div>
+                <div style="font-size:26px;font-weight:700;color:#DC2626;letter-spacing:-1px;line-height:1">3,847</div>
+                <div style="font-size:11.5px;color:#DC2626;margin-top:5px;font-weight:500">↑ 12 since yesterday</div>
+              </div>
+              <div style="width:34px;height:34px;background:#FEF2F2;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+              <div>
+                <div style="font-size:10.5px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px">Last Full Scan</div>
+                <div style="font-size:26px;font-weight:700;color:#0F172A;letter-spacing:-1px;line-height:1">2h ago</div>
+                <div style="font-size:11.5px;color:#6B7280;margin-top:5px;font-weight:500">Next in 22 hours</div>
+              </div>
+              <div style="width:34px;height:34px;background:#F0F9FF;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Filter bar -->
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+          <div style="position:relative;flex:1;min-width:180px">
+            <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:#94A3B8" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input value="{{ searchQuery }}" onInput="{{ onSearch }}" type="text" placeholder="Search domain..." style="width:100%;padding:6px 10px 6px 30px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;color:#374151;outline:none;font-family:inherit;background:white" style-focus="border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,0.08)">
+          </div>
+          <select value="{{ statusFilter }}" onChange="{{ onStatusFilter }}" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;color:#374151;background:white;cursor:pointer;outline:none;font-family:inherit">
+            <option value="all">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Warning">Warning</option>
+            <option value="Unreachable">Unreachable</option>
+            <option value="Parked">Parked</option>
+            <option value="Blacklisted">Blacklisted</option>
+            <option value="Suspended">Suspended</option>
+          </select>
+          <select style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;color:#374151;background:white;cursor:pointer;outline:none;font-family:inherit">
+            <option>All Countries</option>
+            <option>🇺🇸 United States</option>
+            <option>🇬🇧 United Kingdom</option>
+            <option>🇩🇪 Germany</option>
+            <option>🇫🇷 France</option>
+            <option>🇯🇵 Japan</option>
+          </select>
+          <select style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;color:#374151;background:white;cursor:pointer;outline:none;font-family:inherit">
+            <option>All Categories</option>
+            <option>Technology</option>
+            <option>Business</option>
+            <option>News &amp; Media</option>
+            <option>Sports</option>
+          </select>
+          <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:#6B7280;padding:0 2px">
+            <span style="font-weight:500;white-space:nowrap">DR 0–100</span>
+            <input type="range" min="0" max="100" defaultValue="0" style="width:72px;accent-color:#2563EB">
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#F8FAFC">
+                <th onClick="{{ onSortDomain }}" style="{{ thDomain }}" style-hover="color:#1E293B">
+                  <span style="display:inline-flex;align-items:center;gap:4px">Domain <span style="font-size:10px;opacity:0.5">{{ sortDomainInd }}</span></span>
+                </th>
+                <th style="{{ thCountry }}">Country</th>
+                <th onClick="{{ onSortDR }}" style="{{ thDR }}" style-hover="color:#1E293B">
+                  <span style="display:inline-flex;align-items:center;gap:4px">DR <span style="font-size:10px;opacity:0.5">{{ sortDrInd }}</span></span>
+                </th>
+                <th onClick="{{ onSortTraffic }}" style="{{ thTraffic }}" style-hover="color:#1E293B">
+                  <span style="display:inline-flex;align-items:center;gap:4px">Traffic <span style="font-size:10px;opacity:0.5">{{ sortTrafficInd }}</span></span>
+                </th>
+                <th onClick="{{ onSortStatus }}" style="{{ thStatus }}" style-hover="color:#1E293B">
+                  <span style="display:inline-flex;align-items:center;gap:4px">Status <span style="font-size:10px;opacity:0.5">{{ sortStatusInd }}</span></span>
+                </th>
+                <th style="{{ thSSL }}">SSL</th>
+                <th style="{{ thLastCheck }}">Last Check</th>
+                <th style="{{ thActions }}"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ sites }}" as="site" hint-placeholder-count="8">
+                <tr onClick="{{ site.viewSite }}" style="border-top:1px solid #F1F5F9;cursor:pointer;transition:background 0.1s" style-hover="background:#F0F7FF">
+                  <td style="padding:11px 16px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div style="width:22px;height:22px;background:#EFF6FF;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                      </div>
+                      <span style="font-size:13px;font-weight:600;color:#0F172A">{{ site.domain }}</span>
+                    </div>
+                  </td>
+                  <td style="padding:11px 16px">
+                    <span style="font-size:13px">{{ site.flag }}</span>
+                    <span style="font-size:11.5px;color:#6B7280;margin-left:4px">{{ site.country }}</span>
+                  </td>
+                  <td style="padding:11px 16px">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="font-size:14px;font-weight:700;color:#1E293B;min-width:22px">{{ site.dr }}</span>
+                      <svg width="48" height="18" viewBox="0 0 48 18">
+                        <path d="{{ site.sparkPath }}" stroke="{{ site.sparkColor }}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+                      </svg>
+                      <span style="font-size:11px;font-weight:700;color:{{ site.drColor }}">{{ site.drArrow }}</span>
+                    </div>
+                  </td>
+                  <td style="padding:11px 16px">
+                    <span style="font-size:12.5px;color:#374151;font-weight:500">{{ site.trafficDisplay }}</span>
+                  </td>
+                  <td style="padding:11px 16px">
+                    <span style="{{ site.pillStyle }}">
+                      <span style="width:6px;height:6px;border-radius:50%;background:{{ site.dotColor }};flex-shrink:0;display:inline-block"></span>
+                      {{ site.status }}
+                    </span>
+                  </td>
+                  <td style="padding:11px 16px">
+                    <span style="font-size:12px;font-weight:600;color:{{ site.sslColor }}">{{ site.sslText }}</span>
+                  </td>
+                  <td style="padding:11px 16px">
+                    <span style="font-size:12px;color:#6B7280">{{ site.lastCheck }}</span>
+                  </td>
+                  <td style="padding:11px 14px;text-align:right">
+                    <button style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:5px;background:white;font-size:12px;color:#374151;cursor:pointer;font-weight:500;font-family:inherit" style-hover="background:#F8FAFC;border-color:#CBD5E1">
+                      View →
+                    </button>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+
+          <!-- Pagination -->
+          <div style="padding:10px 14px;border-top:1px solid #F1F5F9;display:flex;align-items:center;justify-content:space-between;background:#FAFAFA">
+            <span style="font-size:12px;color:#6B7280">{{ totalRowsText }}</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button onClick="{{ onPrevPage }}" style="{{ prevBtnStyle }}" style-hover="background:#F1F5F9">← Prev</button>
+              <span style="font-size:12px;font-weight:600;color:#374151;padding:0 6px">{{ tablePage }}</span>
+              <button onClick="{{ onNextPage }}" style="{{ nextBtnStyle }}" style-hover="background:#F1F5F9">Next →</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ══ SITE DETAIL PAGE ══ -->
+    <sc-if value="{{ isOnDetail }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:26px 28px;background:#F8FAFC;min-height:100%">
+
+        <button onClick="{{ backToSites }}" style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#6B7280;background:none;border:none;cursor:pointer;padding:0;margin-bottom:14px;font-family:inherit" style-hover="color:#2563EB">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          Back to Sites
+        </button>
+
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+              <h1 style="font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-0.5px">{{ selectedSite }}</h1>
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:#dcfce7;color:#15803d;border-radius:20px;font-size:11px;font-weight:600">
+                <span style="width:6px;height:6px;border-radius:50%;background:#16A34A;display:inline-block"></span>
+                ACTIVE
+              </span>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;font-size:12.5px;color:#6B7280">
+              <span>🇺🇸 English</span>
+              <span style="color:#D1D5DB">·</span>
+              <span>Technology</span>
+              <span style="color:#D1D5DB">·</span>
+              <span>Added Jan 15, 2023</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button style="padding:7px 14px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">Re-check Now</button>
+            <button style="padding:7px 12px;background:white;color:#DC2626;border:1px solid #FECACA;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#FEF2F2">Suspend Site</button>
+            <button style="padding:7px 12px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#F9FAFB">Export Report</button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:22px">
+          <button onClick="{{ setDetailTabOverview }}" style="{{ dtTabOverview }}" style-hover="color:#374151">Overview</button>
+          <button onClick="{{ setDetailTabHistory }}" style="{{ dtTabHistory }}" style-hover="color:#374151">Check History</button>
+          <button onClick="{{ setDetailTabSeo }}" style="{{ dtTabSeo }}" style-hover="color:#374151">SEO Metrics</button>
+          <button onClick="{{ setDetailTabAlerts }}" style="{{ dtTabAlerts }}" style-hover="color:#374151">Alerts</button>
+        </div>
+
+        <!-- Overview tab -->
+        <sc-if value="{{ isDetailOverview }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+
+            <div style="grid-column:1/-1;font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #F1F5F9;padding-bottom:5px">Availability</div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">HTTP Status</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:30px;height:30px;background:#F0FDF4;border-radius:7px;display:flex;align-items:center;justify-content:center">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <div style="font-size:17px;font-weight:700;color:#0F172A">200 OK</div>
+                  <div style="font-size:11px;color:#6B7280">Response normal</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Response Time</div>
+              <div style="font-size:17px;font-weight:700;color:#0F172A;margin-bottom:8px">342 ms</div>
+              <div style="background:#F1F5F9;border-radius:4px;height:5px;overflow:hidden">
+                <div style="background:#16A34A;height:100%;width:17%;border-radius:4px"></div>
+              </div>
+              <div style="font-size:11px;color:#16A34A;margin-top:4px;font-weight:500">Excellent · &lt; 1s threshold</div>
+            </div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">SSL Certificate</div>
+              <div style="font-size:17px;font-weight:700;color:#0F172A;margin-bottom:4px">Valid</div>
+              <div style="font-size:12px;color:#16A34A;font-weight:500">Expires in 187 days</div>
+              <div style="font-size:11px;color:#94A3B8;margin-top:2px">Let's Encrypt · TLS 1.3</div>
+            </div>
+
+            <div style="grid-column:1/-1;font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #F1F5F9;padding-bottom:5px;margin-top:6px">SEO</div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Domain Rating</div>
+              <div style="display:flex;align-items:flex-end;gap:10px">
+                <div style="font-size:30px;font-weight:700;color:#0F172A;line-height:1;letter-spacing:-1px">86</div>
+                <svg width="76" height="30" viewBox="0 0 76 30">
+                  <path d="{{ drSparkPath }}" stroke="#2563EB" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </div>
+              <div style="font-size:11.5px;color:#16A34A;margin-top:6px;font-weight:500">↑ 8 pts in 30 days</div>
+            </div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Organic Traffic</div>
+              <div style="display:flex;align-items:flex-end;gap:10px">
+                <div style="font-size:26px;font-weight:700;color:#0F172A;line-height:1;letter-spacing:-1px">2.4M</div>
+                <svg width="76" height="30" viewBox="0 0 76 30">
+                  <path d="{{ trafficSparkPath }}" stroke="#16A34A" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </div>
+              <div style="font-size:11.5px;color:#6B7280;margin-top:6px">per month</div>
+            </div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Indexed Pages</div>
+              <div style="font-size:26px;font-weight:700;color:#0F172A;line-height:1;letter-spacing:-1px;margin-bottom:6px">48,200</div>
+              <div style="font-size:11.5px;color:#16A34A;font-weight:500">↑ 320 this month</div>
+            </div>
+
+            <div style="grid-column:1/-1;font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #F1F5F9;padding-bottom:5px;margin-top:6px">Content</div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Last Publication</div>
+              <div style="font-size:16px;font-weight:700;color:#0F172A">3 days ago</div>
+              <div style="font-size:11px;color:#16A34A;font-weight:500;margin-top:4px">● Publishing regularly</div>
+            </div>
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Content Type</div>
+              <div style="font-size:16px;font-weight:700;color:#0F172A">Active blog</div>
+              <div style="font-size:11px;color:#6B7280;margin-top:4px">News · Technology focus</div>
+            </div>
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Parking Detected</div>
+              <div style="display:flex;align-items:center;gap:7px">
+                <div style="width:24px;height:24px;background:#F0FDF4;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <span style="font-size:15px;font-weight:600;color:#0F172A">No</span>
+              </div>
+            </div>
+
+            <div style="grid-column:1/-1;font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #F1F5F9;padding-bottom:5px;margin-top:6px">Safety</div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:13px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:13px;color:#374151;font-weight:500">Google Safe Browsing</span>
+                <span style="font-size:12px;font-weight:600;color:#16A34A">✓ Clean</span>
+              </div>
+            </div>
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:13px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:13px;color:#374151;font-weight:500">Spamhaus DBL</span>
+                <span style="font-size:12px;font-weight:600;color:#16A34A">✓ Not listed</span>
+              </div>
+            </div>
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:13px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:13px;color:#374151;font-weight:500">PhishTank</span>
+                <span style="font-size:12px;font-weight:600;color:#16A34A">✓ Clear</span>
+              </div>
+            </div>
+
+            <div style="grid-column:1/-1;font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #F1F5F9;padding-bottom:5px;margin-top:6px">Compliance</div>
+
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:13px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:13px;color:#374151;font-weight:500">About Page</span>
+                <span style="font-size:12px;font-weight:600;color:#16A34A">✓ Found</span>
+              </div>
+            </div>
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:13px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:13px;color:#374151;font-weight:500">Privacy Policy</span>
+                <span style="font-size:12px;font-weight:600;color:#16A34A">✓ Found</span>
+              </div>
+            </div>
+            <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:13px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:13px;color:#374151;font-weight:500">Language Match</span>
+                <span style="font-size:12px;font-weight:600;color:#16A34A">✓ EN confirmed</span>
+              </div>
+            </div>
+
+          </div>
+        </sc-if>
+
+        <!-- History tab -->
+        <sc-if value="{{ isDetailHistory }}" hint-placeholder-val="{{ false }}">
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <div style="font-size:13.5px;font-weight:600;color:#0F172A">DR &amp; Traffic — last 6 months</div>
+              <div style="display:flex;gap:14px;font-size:11.5px;color:#6B7280">
+                <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:2px;background:#2563EB;display:inline-block;border-radius:1px"></span>Domain Rating</span>
+                <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:2px;background:#16A34A;display:inline-block;border-radius:1px"></span>Traffic (K)</span>
+              </div>
+            </div>
+            <svg width="100%" height="130" viewBox="0 0 600 130" preserveAspectRatio="none" style="overflow:visible">
+              <line x1="0" y1="20" x2="600" y2="20" stroke="#F1F5F9" stroke-width="1"></line>
+              <line x1="0" y1="60" x2="600" y2="60" stroke="#F1F5F9" stroke-width="1"></line>
+              <line x1="0" y1="100" x2="600" y2="100" stroke="#F1F5F9" stroke-width="1"></line>
+              <path d="{{ histDrPath }}" stroke="#2563EB" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="{{ histTrafficPath }}" stroke="#16A34A" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;margin-top:6px">
+              <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span>
+            </div>
+          </div>
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="background:#F8FAFC">
+                  <th style="padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Date</th>
+                  <th style="padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">HTTP</th>
+                  <th style="padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Response</th>
+                  <th style="padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">DR</th>
+                  <th style="padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">SSL</th>
+                  <th style="padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #E2E8F0">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ scanHistory }}" as="scan" hint-placeholder-count="5">
+                  <tr style="border-top:1px solid #F1F5F9" style-hover="background:#F8FAFC">
+                    <td style="padding:9px 16px;font-size:12.5px;color:#374151">{{ scan.date }}</td>
+                    <td style="padding:9px 16px;font-size:12.5px;font-weight:600;color:#16A34A">{{ scan.http }}</td>
+                    <td style="padding:9px 16px;font-size:12.5px;color:#374151">{{ scan.response }}</td>
+                    <td style="padding:9px 16px;font-size:12.5px;font-weight:600;color:#374151">{{ scan.dr }}</td>
+                    <td style="padding:9px 16px;font-size:12.5px;color:#16A34A;font-weight:500">{{ scan.ssl }}</td>
+                    <td style="padding:9px 16px">
+                      <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:#dcfce7;color:#15803d">Active</span>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </sc-if>
+
+        <!-- SEO tab -->
+        <sc-if value="{{ isDetailSeo }}" hint-placeholder-val="{{ false }}">
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+            <div style="font-size:13.5px;font-weight:600;color:#0F172A;margin-bottom:16px">SEO Metrics Detail</div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">
+              <div style="padding:16px;background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0">
+                <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Backlinks</div>
+                <div style="font-size:22px;font-weight:700;color:#0F172A">4.2M</div>
+                <div style="font-size:11.5px;color:#16A34A;margin-top:4px">↑ 12K this month</div>
+              </div>
+              <div style="padding:16px;background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0">
+                <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Referring Domains</div>
+                <div style="font-size:22px;font-weight:700;color:#0F172A">18,400</div>
+                <div style="font-size:11.5px;color:#16A34A;margin-top:4px">↑ 230 this month</div>
+              </div>
+              <div style="padding:16px;background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0">
+                <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Organic Keywords</div>
+                <div style="font-size:22px;font-weight:700;color:#0F172A">892K</div>
+                <div style="font-size:11.5px;color:#6B7280;margin-top:4px">top 100 positions</div>
+              </div>
+              <div style="padding:16px;background:#F8FAFC;border-radius:8px;border:1px solid #E2E8F0">
+                <div style="font-size:10.5px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Trust Flow</div>
+                <div style="font-size:22px;font-weight:700;color:#0F172A">68</div>
+                <div style="font-size:11.5px;color:#D97706;margin-top:4px">Good</div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Detail Alerts tab -->
+        <sc-if value="{{ isDetailAlerts }}" hint-placeholder-val="{{ false }}">
+          <div style="background:white;border:1px solid #E2E8F0;border-radius:8px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+            <div style="font-size:13.5px;font-weight:600;color:#0F172A;margin-bottom:16px">Site Alerts</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-left:3px solid #D97706;background:#fffbeb;border-radius:0 8px 8px 0">
+                <span style="font-size:18px;flex-shrink:0">⚠️</span>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:600;color:#1E293B;margin-bottom:2px">DR dropped: 86 → 74 (−12 pts)</div>
+                  <div style="font-size:12px;color:#6B7280">2 hours ago · Auto-resolved if DR recovers</div>
+                </div>
+                <button style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:5px;background:white;font-size:12px;color:#6B7280;cursor:pointer;font-family:inherit" style-hover="background:#F8FAFC">Dismiss</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </sc-if>
+
+    <!-- ══ ALERTS PAGE ══ -->
+    <sc-if value="{{ isOnAlerts }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:26px 28px;background:#F8FAFC;min-height:100%">
+
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px">
+          <div>
+            <h1 style="font-size:20px;font-weight:700;color:#0F172A;letter-spacing:-0.4px">Alerts</h1>
+            <p style="font-size:12.5px;color:#64748B;margin-top:3px">6 active alerts across your network</p>
+          </div>
+          <button style="padding:7px 14px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit" style-hover="background:#F9FAFB">Mark all read</button>
+        </div>
+
+        <!-- Alert tabs -->
+        <div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:18px">
+          <button onClick="{{ setAlertTabAll }}" style="{{ alertTabAll }}" style-hover="color:#374151">All</button>
+          <button onClick="{{ setAlertTabUnresolved }}" style="{{ alertTabUnresolved }}" style-hover="color:#374151">Unresolved</button>
+          <button onClick="{{ setAlertTabCritical }}" style="{{ alertTabCritical }}" style-hover="color:#374151">Critical</button>
+          <button onClick="{{ setAlertTabDismissed }}" style="{{ alertTabDismissed }}" style-hover="color:#374151">Dismissed</button>
+        </div>
+
+        <!-- Alert list -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ alerts }}" as="alert" hint-placeholder-count="5">
+            <div style="{{ alert.rowStyle }}">
+              <span style="font-size:18px;flex-shrink:0;width:26px;text-align:center">{{ alert.icon }}</span>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+                  <span style="{{ alert.domainStyle }}">{{ alert.domain }}</span>
+                  <span style="font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.06em">{{ alert.severityLabel }}</span>
+                </div>
+                <div style="font-size:12.5px;color:#374151">{{ alert.message }}</div>
+              </div>
+              <span style="font-size:11.5px;color:#94A3B8;white-space:nowrap;flex-shrink:0">{{ alert.time }}</span>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button onClick="{{ alert.viewAction }}" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:5px;background:white;font-size:12px;color:#374151;cursor:pointer;font-weight:500;white-space:nowrap;font-family:inherit" style-hover="background:#F8FAFC">View Site</button>
+                <button onClick="{{ alert.dismissAction }}" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:5px;background:white;font-size:12px;color:#6B7280;cursor:pointer;white-space:nowrap;font-family:inherit" style-hover="background:#F8FAFC">Dismiss</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- Empty state (when alertTab = dismissed and none) -->
+        <sc-if value="{{ alertsEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:60px 24px">
+            <div style="font-size:40px;margin-bottom:12px">🎉</div>
+            <div style="font-size:15px;font-weight:600;color:#0F172A;margin-bottom:6px">No active alerts</div>
+            <div style="font-size:13px;color:#6B7280">Everything looks good across your network</div>
+          </div>
+        </sc-if>
+
+      </div>
+    </sc-if>
+
+  </div>
+
+  <!-- ═══════════ IMPORT MODAL ═══════════ -->
+  <sc-if value="{{ showImport }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(15,23,42,0.65);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px)">
+      <div style="background:white;border-radius:12px;width:560px;max-width:95vw;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.22)">
+
+        <!-- Modal header -->
+        <div style="padding:20px 22px 0;display:flex;align-items:flex-start;justify-content:space-between">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#0F172A">Import Sites CSV</div>
+            <!-- Step dots -->
+            <div style="display:flex;align-items:center;gap:5px;margin-top:10px">
+              <div style="{{ stepDot0 }}"></div>
+              <div style="width:20px;height:1px;background:#E2E8F0"></div>
+              <div style="{{ stepDot1 }}"></div>
+              <div style="width:20px;height:1px;background:#E2E8F0"></div>
+              <div style="{{ stepDot2 }}"></div>
+              <div style="width:20px;height:1px;background:#E2E8F0"></div>
+              <div style="{{ stepDot3 }}"></div>
+              <span style="margin-left:8px;font-size:11px;color:#94A3B8">{{ stepLabel }}</span>
+            </div>
+          </div>
+          <button onClick="{{ closeImport }}" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:none;background:#F1F5F9;border-radius:6px;cursor:pointer;color:#6B7280;font-size:15px;flex-shrink:0;font-family:inherit" style-hover="background:#E2E8F0">✕</button>
+        </div>
+
+        <!-- Step 0: Upload -->
+        <sc-if value="{{ isImportStep0 }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:22px">
+            <div onClick="{{ goToImportStep1 }}" style="border:2px dashed #CBD5E1;border-radius:10px;padding:44px 24px;text-align:center;cursor:pointer;transition:all 0.15s" style-hover="border-color:#2563EB;background:#F0F7FF">
+              <div style="width:50px;height:50px;background:#EFF6FF;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              </div>
+              <div style="font-size:14px;font-weight:600;color:#0F172A;margin-bottom:5px">Drop your CSV here or <span style="color:#2563EB;text-decoration:underline">browse files</span></div>
+              <div style="font-size:12px;color:#94A3B8">Supports CSV up to 500 MB</div>
+            </div>
+            <div style="margin-top:14px;background:#F8FAFC;border-radius:8px;padding:12px 14px;border:1px solid #E2E8F0">
+              <div style="font-size:10px;font-weight:600;color:#64748B;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.07em">Expected format</div>
+              <code style="font-size:11.5px;color:#475569;font-family:ui-monospace,Menlo,monospace">domain, country, language, category, dr_at_signup, added_date</code>
+            </div>
+            <div style="margin-top:10px;text-align:center">
+              <a href="#" style="font-size:12px;color:#2563EB;text-decoration:none" style-hover="text-decoration:underline">↓ Download template CSV</a>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Step 1: Preview -->
+        <sc-if value="{{ isImportStep1 }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:22px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+              <div style="width:26px;height:26px;background:#F0FDF4;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+              <span style="font-size:13.5px;font-weight:600;color:#0F172A">Detected 105,000 rows · 6 columns auto-mapped</span>
+            </div>
+            <div style="border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;margin-bottom:16px">
+              <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                  <tr style="background:#F8FAFC">
+                    <th style="padding:8px 12px;text-align:left;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0">domain</th>
+                    <th style="padding:8px 12px;text-align:left;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0">country</th>
+                    <th style="padding:8px 12px;text-align:left;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0">language</th>
+                    <th style="padding:8px 12px;text-align:left;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0">category</th>
+                    <th style="padding:8px 12px;text-align:left;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0">dr</th>
+                    <th style="padding:8px 12px;text-align:left;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0">added</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-top:1px solid #F1F5F9"><td style="padding:7px 12px;color:#374151">techcrunch.com</td><td style="padding:7px 12px;color:#374151">US</td><td style="padding:7px 12px;color:#374151">EN</td><td style="padding:7px 12px;color:#374151">Technology</td><td style="padding:7px 12px;color:#374151">86</td><td style="padding:7px 12px;color:#374151">2023-01-15</td></tr>
+                  <tr style="border-top:1px solid #F1F5F9"><td style="padding:7px 12px;color:#374151">forbes.com</td><td style="padding:7px 12px;color:#374151">US</td><td style="padding:7px 12px;color:#374151">EN</td><td style="padding:7px 12px;color:#374151">Business</td><td style="padding:7px 12px;color:#374151">91</td><td style="padding:7px 12px;color:#374151">2023-01-15</td></tr>
+                  <tr style="border-top:1px solid #F1F5F9"><td style="padding:7px 12px;color:#374151">mediablog.fr</td><td style="padding:7px 12px;color:#374151">FR</td><td style="padding:7px 12px;color:#374151">FR</td><td style="padding:7px 12px;color:#374151">Media</td><td style="padding:7px 12px;color:#374151">52</td><td style="padding:7px 12px;color:#374151">2023-02-01</td></tr>
+                  <tr style="border-top:1px solid #F1F5F9"><td style="padding:7px 12px;color:#94A3B8" colspan="6">… 104,997 more rows</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button onClick="{{ closeImport }}" style="padding:7px 14px;background:white;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>
+              <button onClick="{{ startImport }}" style="padding:7px 18px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">Start Import →</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Step 2: Progress -->
+        <sc-if value="{{ isImportStep2 }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:32px 24px;text-align:center">
+            <div style="font-size:15px;font-weight:700;color:#0F172A;margin-bottom:5px">Importing 105,000 domains...</div>
+            <div style="font-size:12.5px;color:#6B7280;margin-bottom:22px">Please keep this window open</div>
+            <div style="background:#F1F5F9;border-radius:8px;height:10px;overflow:hidden;margin-bottom:10px">
+              <div style="{{ progressBarStyle }}"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#6B7280;margin-bottom:18px">
+              <span>{{ importProcessed }} / 105,000 processed</span>
+              <span style="font-weight:600;color:#2563EB">{{ importProgressPct }}</span>
+            </div>
+            <div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;border:1px solid #E2E8F0;font-size:12px;color:#475569;text-align:left">
+              <span style="font-weight:600">Batch 85/210</span> · ETA 3m 20s · Checking DNS, SSL, HTTP status...
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Step 3: Success -->
+        <sc-if value="{{ isImportStep3 }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:44px 24px;text-align:center">
+            <div style="width:60px;height:60px;background:#F0FDF4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div style="font-size:18px;font-weight:700;color:#0F172A;margin-bottom:8px">Import Complete</div>
+            <div style="font-size:14px;font-weight:600;color:#16A34A;margin-bottom:4px">✓ 104,987 sites imported</div>
+            <div style="font-size:12.5px;color:#94A3B8;margin-bottom:26px">13 skipped (duplicates)</div>
+            <button onClick="{{ viewAllSites }}" style="padding:9px 22px;background:#2563EB;color:white;border:none;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit" style-hover="background:#1D4ED8">View All Sites →</button>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    page: 'sites',
+    selectedSite: null,
+    detailTab: 'overview',
+    alertTab: 'all',
+    showImport: false,
+    importStep: 0,
+    importProgress: 0,
+    importTimer: null,
+    searchQuery: '',
+    statusFilter: 'all',
+    sortCol: 'dr',
+    sortDir: 'desc',
+    tablePage: 1,
+    alertDismissedIds: [],
+  };
+
+  SC = {
+    Active:      { bg:'#dcfce7', color:'#15803d', dot:'#16A34A' },
+    Warning:     { bg:'#fef9c3', color:'#92400e', dot:'#D97706' },
+    Blacklisted: { bg:'#fee2e2', color:'#991b1b', dot:'#DC2626' },
+    Parked:      { bg:'#f1f5f9', color:'#475569', dot:'#94A3B8' },
+    Suspended:   { bg:'#ffedd5', color:'#9a3412', dot:'#EA580C' },
+    Unreachable: { bg:'#fee2e2', color:'#b91c1c', dot:'#DC2626' },
+  };
+
+  FLAGS = { US:'🇺🇸', RU:'🇷🇺', DE:'🇩🇪', GB:'🇬🇧', FR:'🇫🇷', JP:'🇯🇵', IN:'🇮🇳', CA:'🇨🇦', ES:'🇪🇸', AU:'🇦🇺' };
+
+  SITES = [
+    { id:1,  domain:'techcrunch.com',        country:'US', dr:86, drTrend:1,  traffic:'2.4M',  trafficRaw:2400000, status:'Active',      ssl:true,  sslDays:187, lastCheck:'2h ago',  drHistory:[74,76,78,79,82,84,86] },
+    { id:2,  domain:'forbes.com',            country:'US', dr:91, drTrend:0,  traffic:'18.3M', trafficRaw:18300000,status:'Active',      ssl:true,  sslDays:204, lastCheck:'2h ago',  drHistory:[89,90,90,91,91,91,91] },
+    { id:3,  domain:'businessinsider.de',    country:'DE', dr:78, drTrend:1,  traffic:'1.1M',  trafficRaw:1100000, status:'Active',      ssl:true,  sslDays:92,  lastCheck:'2h ago',  drHistory:[72,74,75,76,77,78,78] },
+    { id:4,  domain:'mediablog.fr',          country:'FR', dr:52, drTrend:1,  traffic:'340K',  trafficRaw:340000,  status:'Active',      ssl:true,  sslDays:155, lastCheck:'2h ago',  drHistory:[48,49,50,51,51,52,52] },
+    { id:5,  domain:'gadgetreview.jp',       country:'JP', dr:64, drTrend:2,  traffic:'890K',  trafficRaw:890000,  status:'Active',      ssl:true,  sslDays:67,  lastCheck:'2h ago',  drHistory:[58,59,61,62,63,64,64] },
+    { id:6,  domain:'techblog.es',           country:'ES', dr:58, drTrend:1,  traffic:'210K',  trafficRaw:210000,  status:'Active',      ssl:true,  sslDays:133, lastCheck:'2h ago',  drHistory:[55,55,56,56,57,58,58] },
+    { id:7,  domain:'oldnews.co.uk',         country:'GB', dr:34, drTrend:-2, traffic:'12K',   trafficRaw:12000,   status:'Warning',     ssl:true,  sslDays:12,  lastCheck:'2h ago',  drHistory:[40,39,38,37,36,35,34] },
+    { id:8,  domain:'ssl-expiring.com',      country:'CA', dr:45, drTrend:0,  traffic:'78K',   trafficRaw:78000,   status:'Warning',     ssl:true,  sslDays:7,   lastCheck:'3h ago',  drHistory:[45,45,45,45,45,45,45] },
+    { id:9,  domain:'spamsite.net',          country:'RU', dr:12, drTrend:-3, traffic:'800',   trafficRaw:800,     status:'Blacklisted', ssl:false, sslDays:0,   lastCheck:'2h ago',  drHistory:[18,17,16,15,14,13,12] },
+    { id:10, domain:'parked2023.com',        country:'US', dr:8,  drTrend:0,  traffic:'0',     trafficRaw:0,       status:'Parked',      ssl:false, sslDays:0,   lastCheck:'2h ago',  drHistory:[8,8,8,8,8,8,8] },
+    { id:11, domain:'suspended-site.org',    country:'IN', dr:22, drTrend:-3, traffic:'4K',    trafficRaw:4000,    status:'Suspended',   ssl:false, sslDays:0,   lastCheck:'5h ago',  drHistory:[28,27,26,25,24,23,22] },
+    { id:12, domain:'unreachable-portal.io', country:'US', dr:31, drTrend:-4, traffic:'55K',   trafficRaw:55000,   status:'Unreachable', ssl:false, sslDays:0,   lastCheck:'6h ago',  drHistory:[38,37,36,35,34,33,31] },
+  ];
+
+  ALERTS = [
+    { id:1, sev:'warning',  domain:'techcrunch.com',       msg:'DR dropped: 86 → 74 (−12 pts)',               time:'2h ago',  dismissed:false },
+    { id:2, sev:'critical', domain:'spamsite.net',          msg:'Added to Google Safe Browsing blocklist',      time:'5h ago',  dismissed:false },
+    { id:3, sev:'warning',  domain:'oldnews.co.uk',         msg:'No content updates in 91 days',               time:'1d ago',  dismissed:false },
+    { id:4, sev:'info',     domain:'ssl-expiring.com',      msg:'SSL certificate expires in 7 days',           time:'3h ago',  dismissed:false },
+    { id:5, sev:'critical', domain:'unreachable-portal.io', msg:'Site returned 503 for 4 consecutive checks',  time:'6h ago',  dismissed:false },
+    { id:6, sev:'warning',  domain:'parked2023.com',        msg:'Parking page detected — content removed',     time:'12h ago', dismissed:true  },
+    { id:7, sev:'info',     domain:'suspended-site.org',    msg:'Domain registrar suspended account flagged',  time:'8h ago',  dismissed:false },
+  ];
+
+  SCAN_HISTORY = [
+    { date:'Jul 2, 2026 · 10:32 AM', http:'200 OK', response:'342ms', dr:'86', ssl:'✓ 187d' },
+    { date:'Jul 2, 2026 · 08:31 AM', http:'200 OK', response:'318ms', dr:'86', ssl:'✓ 187d' },
+    { date:'Jul 1, 2026 · 10:30 AM', http:'200 OK', response:'295ms', dr:'86', ssl:'✓ 188d' },
+    { date:'Jun 30, 2026 · 10:29 AM', http:'200 OK', response:'401ms', dr:'85', ssl:'✓ 189d' },
+    { date:'Jun 29, 2026 · 10:31 AM', http:'200 OK', response:'312ms', dr:'85', ssl:'✓ 190d' },
+  ];
+
+  spark(data, w = 48, h = 18) {
+    if (!data || data.length < 2) return '';
+    const mn = Math.min(...data), mx = Math.max(...data), rng = mx - mn || 1;
+    const pts = data.map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((v - mn) / rng) * (h - 2) - 1;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return 'M ' + pts.join(' L ');
+  }
+
+  filteredSites() {
+    const { searchQuery, statusFilter, sortCol, sortDir } = this.state;
+    let s = [...this.SITES];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      s = s.filter(x => x.domain.includes(q) || x.country.toLowerCase().includes(q));
+    }
+    if (statusFilter !== 'all') s = s.filter(x => x.status === statusFilter);
+    s.sort((a, b) => {
+      let av = a[sortCol], bv = b[sortCol];
+      if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+      return sortDir === 'asc' ? (av < bv ? -1 : av > bv ? 1 : 0) : (av > bv ? -1 : av < bv ? 1 : 0);
+    });
+    return s;
+  }
+
+  startImport() {
+    if (this.state.importTimer) clearInterval(this.state.importTimer);
+    this.setState({ importStep: 2, importProgress: 0 });
+    let p = 0;
+    const t = setInterval(() => {
+      p += Math.random() * 2.2 + 0.4;
+      if (p >= 100) {
+        p = 100;
+        clearInterval(t);
+        this.setState({ importProgress: 100, importTimer: null });
+        setTimeout(() => this.setState({ importStep: 3 }), 500);
+      } else {
+        this.setState({ importProgress: p });
+      }
+    }, 80);
+    this.setState({ importTimer: t });
+  }
+
+  componentWillUnmount() {
+    if (this.state.importTimer) clearInterval(this.state.importTimer);
+  }
+
+  renderVals() {
+    const {
+      page, selectedSite, detailTab, alertTab, showImport, importStep,
+      importProgress, searchQuery, statusFilter, sortCol, sortDir,
+      tablePage, alertDismissedIds
+    } = this.state;
+
+    // ── Nav styles ──
+    const nb = { display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'13.5px', border:'none', width:'100%', textAlign:'left', fontFamily:'inherit', fontWeight:400, transition:'background 0.1s' };
+    const ni = p => ({ ...nb, background: page===p ? 'rgba(37,99,235,0.22)' : 'transparent', color: page===p ? '#93C5FD' : '#94A3B8', fontWeight: page===p ? 600 : 400 });
+
+    // ── Table data ──
+    const all = this.filteredSites();
+    const RPP = 10, totalPages = Math.max(1, Math.ceil(all.length / RPP));
+    const safeTablePage = Math.min(tablePage, totalPages);
+    const start = (safeTablePage - 1) * RPP;
+    const paged = all.slice(start, start + RPP);
+
+    const sites = paged.map(s => {
+      const sc = this.SC[s.status] || this.SC.Active;
+      return {
+        ...s,
+        flag: this.FLAGS[s.country] || '🌐',
+        pillStyle: { display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 8px', borderRadius:'6px', fontSize:'11px', fontWeight:600, background:sc.bg, color:sc.color, whiteSpace:'nowrap' },
+        dotColor: sc.dot,
+        drArrow: s.drTrend > 0 ? '↑' : s.drTrend < 0 ? '↓' : '',
+        drColor: s.drTrend > 0 ? '#16A34A' : s.drTrend < 0 ? '#DC2626' : '#94A3B8',
+        sslText: s.ssl ? `✓ ${s.sslDays}d` : '✗',
+        sslColor: s.ssl ? (s.sslDays < 14 ? '#D97706' : '#16A34A') : '#DC2626',
+        sparkPath: this.spark(s.drHistory),
+        sparkColor: s.drTrend >= 0 ? '#2563EB' : '#DC2626',
+        trafficDisplay: s.traffic + '/mo',
+        viewSite: () => this.setState({ page:'detail', selectedSite: s.domain }),
+      };
+    });
+
+    // ── Table headers ──
+    const thB = { padding:'10px 16px', textAlign:'left', fontSize:'10.5px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', cursor:'pointer', whiteSpace:'nowrap', borderBottom:'1px solid #E2E8F0' };
+    const thS = col => ({ ...thB, color: sortCol===col ? '#1E3A8A' : '#64748B' });
+    const thN = { ...thB, color:'#64748B', cursor:'default' };
+    const thR = { ...thB, color:'#64748B', cursor:'default', textAlign:'right' };
+    const si = col => sortCol===col ? (sortDir==='asc' ? '↑' : '↓') : '↕';
+
+    // ── Pagination ──
+    const pBB = { padding:'5px 10px', border:'1px solid #E2E8F0', borderRadius:'5px', background:'white', fontSize:'12px', fontFamily:'inherit', fontWeight:500 };
+    const prevBtnStyle = { ...pBB, color: safeTablePage > 1 ? '#374151' : '#CBD5E1', cursor: safeTablePage > 1 ? 'pointer' : 'default' };
+    const nextBtnStyle = { ...pBB, color: safeTablePage < totalPages ? '#374151' : '#CBD5E1', cursor: safeTablePage < totalPages ? 'pointer' : 'default' };
+
+    // ── Alerts ──
+    const SEV = {
+      critical: { border:'#DC2626', bg:'#fff5f5', icon:'🔴', label:'Critical' },
+      warning:  { border:'#D97706', bg:'#fffbeb', icon:'⚠️', label:'Warning' },
+      info:     { border:'#2563EB', bg:'#eff6ff', icon:'ℹ️', label:'Info' },
+    };
+    const filteredAlerts = this.ALERTS.filter(a => {
+      const dis = a.dismissed || alertDismissedIds.includes(a.id);
+      if (alertTab === 'unresolved') return !dis;
+      if (alertTab === 'critical')   return a.sev === 'critical' && !dis;
+      if (alertTab === 'dismissed')  return dis;
+      return true;
+    });
+    const alerts = filteredAlerts.map(a => {
+      const dis = a.dismissed || alertDismissedIds.includes(a.id);
+      const sc = SEV[a.sev];
+      return {
+        ...a,
+        icon: sc.icon,
+        severityLabel: sc.label,
+        message: a.msg,
+        rowStyle: { display:'flex', alignItems:'center', gap:'14px', padding:'13px 18px', borderLeft:`3px solid ${sc.border}`, background: dis ? '#FAFAFA' : sc.bg, borderRadius:'0 8px 8px 0', opacity: dis ? 0.6 : 1 },
+        domainStyle: { fontWeight:600, fontSize:'13.5px', color: dis ? '#9CA3AF' : '#1E293B', textDecoration: dis ? 'line-through' : 'none' },
+        dismissAction: () => this.setState(s => ({ alertDismissedIds: [...s.alertDismissedIds, a.id] })),
+        viewAction: () => this.setState({ page:'detail', selectedSite: a.domain }),
+      };
+    });
+
+    // ── Tab styles ──
+    const tabBase = { padding:'9px 14px', background:'none', border:'none', cursor:'pointer', fontSize:'13.5px', fontFamily:'inherit', fontWeight:400 };
+    const tabAct  = { ...tabBase, color:'#2563EB', fontWeight:600, boxShadow:'inset 0 -2px 0 #2563EB' };
+    const tabIna  = { ...tabBase, color:'#6B7280' };
+    const dt = t => detailTab === t ? tabAct : tabIna;
+    const at = t => alertTab  === t ? tabAct : tabIna;
+
+    // ── Sparklines for detail page ──
+    const drHistory      = [74,76,78,79,82,84,86];
+    const trafficHistory = [180,195,210,225,215,230,240];
+    const drSparkPath      = this.spark(drHistory, 76, 30);
+    const trafficSparkPath = this.spark(trafficHistory, 76, 30);
+    const histDrPath      = this.spark(drHistory, 600, 110);
+    const histTrafficPath = this.spark(trafficHistory, 600, 110);
+
+    // ── Import modal ──
+    const pct = Math.round(importProgress);
+    const processed = Math.round(importProgress * 1049.87).toLocaleString();
+    const progressBarStyle = { background:'linear-gradient(90deg,#2563EB,#3B82F6)', height:'100%', borderRadius:'8px', transition:'width 0.1s linear', width:`${pct}%` };
+    const dotStyle = i => ({
+      width:'8px', height:'8px', borderRadius:'50',
+      background: importStep === i ? '#2563EB' : importStep > i ? '#16A34A' : '#E2E8F0',
+      borderRadius:'50%'
+    });
+    const stepLabels = ['Upload','Preview','Importing','Done'];
+
+    return {
+      // Page flags
+      isOnSites:   page === 'sites',
+      isOnDetail:  page === 'detail',
+      isOnAlerts:  page === 'alerts',
+
+      // Nav
+      navDashStyle:    ni('dashboard'),
+      navSitesStyle:   ni('sites'),
+      navAlertsStyle:  ni('alerts'),
+      navReportsStyle: ni('reports'),
+      navSettingsStyle:ni('settings'),
+      navToSites:   () => this.setState({ page:'sites' }),
+      navToAlerts:  () => this.setState({ page:'alerts' }),
+      navToReports: () => {},
+      navToSettings:() => {},
+
+      // Sites table
+      sites,
+      searchQuery,
+      onSearch:       e => this.setState({ searchQuery: e.target.value, tablePage:1 }),
+      statusFilter,
+      onStatusFilter: e => this.setState({ statusFilter: e.target.value, tablePage:1 }),
+      totalRowsText: `Showing ${start+1}–${Math.min(start+RPP, all.length)} of 105,000`,
+      onPrevPage: () => this.setState(s => ({ tablePage: Math.max(1, s.tablePage-1) })),
+      onNextPage: () => this.setState(s => ({ tablePage: Math.min(totalPages, s.tablePage+1) })),
+      prevBtnStyle, nextBtnStyle,
+      tablePage: safeTablePage,
+      thDomain: thS('domain'), thCountry: thN, thDR: thS('dr'),
+      thTraffic: thS('trafficRaw'), thStatus: thS('status'),
+      thSSL: thN, thLastCheck: thN, thActions: thR,
+      sortDomainInd: si('domain'), sortDrInd: si('dr'),
+      sortTrafficInd: si('trafficRaw'), sortStatusInd: si('status'),
+      onSortDomain:  () => this.setState(s => ({ sortCol:'domain',     sortDir: s.sortCol==='domain'     && s.sortDir==='desc' ? 'asc':'desc', tablePage:1 })),
+      onSortDR:      () => this.setState(s => ({ sortCol:'dr',         sortDir: s.sortCol==='dr'         && s.sortDir==='desc' ? 'asc':'desc', tablePage:1 })),
+      onSortTraffic: () => this.setState(s => ({ sortCol:'trafficRaw', sortDir: s.sortCol==='trafficRaw' && s.sortDir==='desc' ? 'asc':'desc', tablePage:1 })),
+      onSortStatus:  () => this.setState(s => ({ sortCol:'status',     sortDir: s.sortCol==='status'     && s.sortDir==='desc' ? 'asc':'desc', tablePage:1 })),
+
+      // Import
+      openImport: () => this.setState({ showImport:true, importStep:0, importProgress:0 }),
+      showImport, importStep,
+      importProgressPct: `${pct}%`,
+      importProcessed: processed,
+      isImportStep0: importStep === 0,
+      isImportStep1: importStep === 1,
+      isImportStep2: importStep === 2,
+      isImportStep3: importStep === 3,
+      closeImport:     () => this.setState({ showImport:false }),
+      goToImportStep1: () => this.setState({ importStep:1 }),
+      startImport:     () => this.startImport(),
+      viewAllSites:    () => this.setState({ showImport:false, page:'sites' }),
+      progressBarStyle,
+      stepDot0: dotStyle(0), stepDot1: dotStyle(1),
+      stepDot2: dotStyle(2), stepDot3: dotStyle(3),
+      stepLabel: stepLabels[importStep] || '',
+
+      // Site detail
+      selectedSite: selectedSite || 'techcrunch.com',
+      detailTab,
+      backToSites:         () => this.setState({ page:'sites' }),
+      setDetailTabOverview:() => this.setState({ detailTab:'overview' }),
+      setDetailTabHistory: () => this.setState({ detailTab:'history' }),
+      setDetailTabSeo:     () => this.setState({ detailTab:'seo' }),
+      setDetailTabAlerts:  () => this.setState({ detailTab:'alerts' }),
+      dtTabOverview: dt('overview'),
+      dtTabHistory:  dt('history'),
+      dtTabSeo:      dt('seo'),
+      dtTabAlerts:   dt('alerts'),
+      isDetailOverview: detailTab === 'overview',
+      isDetailHistory:  detailTab === 'history',
+      isDetailSeo:      detailTab === 'seo',
+      isDetailAlerts:   detailTab === 'alerts',
+      drSparkPath, trafficSparkPath, histDrPath, histTrafficPath,
+      scanHistory: this.SCAN_HISTORY,
+
+      // Alerts
+      alerts,
+      alertsEmpty: alerts.length === 0,
+      alertTab,
+      setAlertTabAll:       () => this.setState({ alertTab:'all' }),
+      setAlertTabUnresolved:() => this.setState({ alertTab:'unresolved' }),
+      setAlertTabCritical:  () => this.setState({ alertTab:'critical' }),
+      setAlertTabDismissed: () => this.setState({ alertTab:'dismissed' }),
+      alertTabAll:       at('all'),
+      alertTabUnresolved:at('unresolved'),
+      alertTabCritical:  at('critical'),
+      alertTabDismissed: at('dismissed'),
+    };
+  }
+}
+</script>
+</body>
+</html>
