@@ -390,10 +390,10 @@ export function AlertsPage({ onViewSite }: Props) {
   const [backendStats, setBackendStats] = useState<{ total: number; dead: number; critical: number; warning: number; http0: number; http404: number; http403: number; http429: number; http5xx: number; redirect: number; parked: number } | null>(null)
 
   // Load each column independently — no shared limit
-  const newAlertsLive       = useQuery(listByColumnFn, { workflowStatus: 'new',         limit: 5000 }) ?? []
-  const urgentAlertsLive    = useQuery(listByColumnFn, { workflowStatus: 'urgent',       limit: 5000 }) ?? []
-  const inProgressAlertsLive = useQuery(listByColumnFn, { workflowStatus: 'in_progress', limit: 500  }) ?? []
-  const doneAlertsLive      = useQuery(listByColumnFn, { workflowStatus: 'done',         limit: 500  }) ?? []
+  const newAlertsLive       = useQuery(listByColumnFn, { workflowStatus: 'new',         limit: 16384 }) ?? []
+  const urgentAlertsLive    = useQuery(listByColumnFn, { workflowStatus: 'urgent',       limit: 16384 }) ?? []
+  const inProgressAlertsLive = useQuery(listByColumnFn, { workflowStatus: 'in_progress', limit: 16384 }) ?? []
+  const doneAlertsLive      = useQuery(listByColumnFn, { workflowStatus: 'done',         limit: 16384 }) ?? []
 
   const newAlerts       = useDeferredValue(newAlertsLive)
   const urgentAlerts    = useDeferredValue(urgentAlertsLive)
