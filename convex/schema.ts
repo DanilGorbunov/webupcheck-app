@@ -63,9 +63,14 @@ export default defineSchema({
     createdAt: v.number(),
     dismissed: v.boolean(),
     dismissedAt: v.optional(v.number()),
+    workflowStatus: v.optional(v.string()), // new | urgent | in_progress | done
+    aiCategory: v.optional(v.string()),     // site_down | domain_parked | cdn_issue | ssl_expiry | redirect_change | server_error | unknown
+    aiPriority: v.optional(v.number()),     // 0-100
+    aiReason: v.optional(v.string()),
   })
     .index('by_site', ['siteId'])
     .index('by_dismissed', ['dismissed'])
+    .index('by_dismissed_workflow', ['dismissed', 'workflowStatus'])
     .index('by_created', ['createdAt']),
 
   checkQueue: defineTable({
@@ -77,6 +82,11 @@ export default defineSchema({
   })
     .index('by_status', ['status'])
     .index('by_batch', ['batchId']),
+
+  counters: defineTable({
+    name: v.string(),
+    value: v.number(),
+  }).index('by_name', ['name']),
 
   syncLog: defineTable({
     type: v.string(), // medialister_sync | check_run

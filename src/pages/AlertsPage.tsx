@@ -10,6 +10,7 @@ type DbAlert = any
 type ConvexId = any
 
 const listAlertsFn          = makeFunctionReference<'query',    { dismissed?: boolean; limit?: number }, DbAlert[]>('sites:listAlerts')
+const listByColumnFn        = makeFunctionReference<'query',    { workflowStatus: string; limit?: number }, DbAlert[]>('sites:listAlertsByColumn')
 const countAlertsFn         = makeFunctionReference<'query',    { dismissed?: boolean }, number>('sites:countAlerts')
 const alertStatsFn          = makeFunctionReference<'action',   Record<string, never>, { total: number; dead: number; critical: number; warning: number; http0: number; http404: number; http403: number; http429: number; http5xx: number; redirect: number; parked: number }>('sites:alertStats')
 const dismissAllFn          = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
@@ -30,12 +31,6 @@ const COLUMNS: { id: WorkflowCol; label: string; color: string; bg: string; sub?
 ]
 
 // legacy values from old schema map to new columns
-function normalizeCol(val: string | undefined): WorkflowCol {
-  if (val === 'fixed' || val === 'ignored' || val === 'done') return 'done'
-  if (val === 'urgent') return 'urgent'
-  if (val === 'in_progress') return 'in_progress'
-  return 'new'
-}
 
 const HTTP_FILTERS = [
   { code: 'http 0',    label: 'HTTP 0',    statsKey: 'http0'    },
@@ -393,8 +388,19 @@ export function AlertsPage({ onViewSite }: Props) {
   const totalAlertCount = useQuery(countAlertsFn, { dismissed: false }) ?? null
   const runAlertStats = useAction(alertStatsFn)
   const [backendStats, setBackendStats] = useState<{ total: number; dead: number; critical: number; warning: number; http0: number; http404: number; http403: number; http429: number; http5xx: number; redirect: number; parked: number } | null>(null)
-  const alertsLive = useQuery(listAlertsFn, { dismissed: false, limit: 16384 }) ?? []
-  // Defer Kanban re-renders — React batches rapid updates during cron runs
+
+  // Load each column independently — no shared limit
+  const newAlertsLive       = useQuery(listByColumnFn, { workflowStatus: 'new',         limit: 5000 }) ?? []
+  const urgentAlertsLive    = useQuery(listByColumnFn, { workflowStatus: 'urgent',       limit: 5000 }) ?? []
+  const inProgressAlertsLive = useQuery(listByColumnFn, { workflowStatus: 'in_progress', limit: 500  }) ?? []
+  const doneAlertsLive      = useQuery(listByColumnFn, { workflowStatus: 'done',         limit: 500  }) ?? []
+
+  const newAlerts       = useDeferredValue(newAlertsLive)
+  const urgentAlerts    = useDeferredValue(urgentAlertsLive)
+  const inProgressAlerts = useDeferredValue(inProgressAlertsLive)
+  const doneAlerts      = useDeferredValue(doneAlertsLive)
+
+  const alertsLive = useQuery(listAlertsFn, { dismissed: false, limit: 500 }) ?? []
   const alerts = useDeferredValue(alertsLive)
 
   function showMoreInCol(colId: WorkflowCol) {
@@ -472,36 +478,32 @@ export function AlertsPage({ onViewSite }: Props) {
     return { codeCounts, deadCount: dead, criticalCount: critical, warningCount: warning }
   }, [alerts, backendStats])
 
-  // Apply filters
-  const filtered = useMemo(() => alerts.filter(a => {
-    const msg = (a.message ?? '').toLowerCase()
-    if (httpFilter && !msg.includes(httpFilter)) return false
-    if (severityFilter) {
-      const label = getSeverityStyle(a).label
-      if (severityFilter === 'dead' && label !== 'DEAD') return false
-      if (severityFilter === 'critical' && label !== 'CRITICAL') return false
-      if (severityFilter === 'warning' && label !== 'WARNING') return false
-    }
-    if (search) {
-      const q = search.toLowerCase()
-      if (!a.domain?.toLowerCase().includes(q) && !msg.includes(q)) return false
-    }
-    return true
-  }), [alerts, httpFilter, severityFilter, search])
-
-  // Group by workflow status (server truth)
-  const byCol = useMemo(() => {
-    const cols: Record<WorkflowCol, DbAlert[]> = { new: [], urgent: [], in_progress: [], done: [] }
-    for (const a of filtered) {
-      if (a.workflowStatus) {
-        cols[normalizeCol(a.workflowStatus)].push(a)
-      } else {
-        const sev = getSeverityStyle(a).label
-        cols[sev === 'DEAD' || sev === 'CRITICAL' ? 'urgent' : 'new'].push(a)
+  // Filter function applied per column
+  function applyFilters(list: DbAlert[]) {
+    return list.filter(a => {
+      const msg = (a.message ?? '').toLowerCase()
+      if (httpFilter && !msg.includes(httpFilter)) return false
+      if (severityFilter) {
+        const label = getSeverityStyle(a).label
+        if (severityFilter === 'dead' && label !== 'DEAD') return false
+        if (severityFilter === 'critical' && label !== 'CRITICAL') return false
+        if (severityFilter === 'warning' && label !== 'WARNING') return false
       }
-    }
-    return cols
-  }, [filtered])
+      if (search) {
+        const q = search.toLowerCase()
+        if (!a.domain?.toLowerCase().includes(q) && !msg.includes(q)) return false
+      }
+      return true
+    })
+  }
+
+  const byCol = useMemo(() => ({
+    new:         applyFilters(newAlerts),
+    urgent:      applyFilters(urgentAlerts),
+    in_progress: applyFilters(inProgressAlerts),
+    done:        applyFilters(doneAlerts),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [newAlerts, urgentAlerts, inProgressAlerts, doneAlerts, httpFilter, severityFilter, search])
 
   // Apply local ordering on top of server grouping
   const displayCols = useMemo(() => {

@@ -228,6 +228,7 @@ export const saveCheckResult = mutation({
         subdomains: [site.domain],
         createdAt: Date.now(),
         dismissed: false,
+        workflowStatus: severity === 'critical' ? 'urgent' : 'new',
       })
       await adjustCounter(ctx, 'alerts_active', 1)
       await ctx.scheduler.runAfter(0, internal.ai.classifyAlert, { alertId: subAlertId })
@@ -241,7 +242,7 @@ export const saveCheckResult = mutation({
       message,
       createdAt: Date.now(),
       dismissed: false,
-      // bot_blocked is pre-categorized — skip AI classification
+      workflowStatus: severity === 'critical' ? 'urgent' : 'new',
       ...(isBotBlocked ? { aiCategory: 'bot_blocked' } : {}),
     })
     await adjustCounter(ctx, 'alerts_active', 1)
@@ -958,5 +959,53 @@ export const alertStats = action({
       cursor = page.cursor
     }
     return totals
+  },
+})
+
+export const listAlertsByColumn = query({
+  args: {
+    workflowStatus: v.string(),
+    cursor: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { workflowStatus, cursor, limit = 500 }) => {
+    return ctx.db.query('alerts')
+      .withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', workflowStatus))
+      .order('desc')
+      .take(limit)
+  },
+})
+
+export const migrateAlertWorkflowStatusPage = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .paginate({ cursor: cursor ?? null, numItems: 500 })
+    let count = 0
+    for (const a of page.page) {
+      if (a.workflowStatus) continue
+      const isDead = (a.message ?? '').toLowerCase().includes('http 0') || (a.message ?? '').toLowerCase().includes('consecutive')
+      const status = (isDead || a.severity === 'critical') ? 'urgent' : 'new'
+      await ctx.db.patch(a._id, { workflowStatus: status })
+      count++
+    }
+    return { patched: count, isDone: page.isDone, cursor: page.continueCursor }
+  },
+})
+
+export const migrateAlertWorkflowStatus = action({
+  args: {},
+  handler: async (ctx) => {
+    let cursor: string | undefined = undefined
+    let total = 0
+    let done = false
+    while (!done) {
+      const result: any = await ctx.runMutation(internal.sites.migrateAlertWorkflowStatusPage, { cursor })
+      total += result.patched
+      done = result.isDone
+      cursor = result.cursor
+    }
+    return { total }
   },
 })
