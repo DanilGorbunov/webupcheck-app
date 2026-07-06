@@ -354,6 +354,10 @@ export const listAlerts = query({
 export const countAlerts = query({
   args: { dismissed: v.optional(v.boolean()) },
   handler: async (ctx, { dismissed = false }) => {
+    const name = dismissed ? 'alerts_dismissed' : 'alerts_active'
+    const counter = await ctx.db.query('counters').withIndex('by_name', q => q.eq('name', name)).first()
+    if (counter !== null) return counter.value
+    // Fallback if counter not yet initialized
     const rows = await ctx.db.query('alerts')
       .withIndex('by_dismissed', q => q.eq('dismissed', dismissed))
       .take(16384)
@@ -361,20 +365,40 @@ export const countAlerts = query({
   },
 })
 
-// One-time call to initialize the counter from real DB data
-export const initAlertCounter = mutation({
+export const rebuildAlertCounterPage = internalMutation({
+  args: { cursor: v.optional(v.string()), count: v.number() },
+  handler: async (ctx, { cursor, count }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .paginate({ cursor: cursor ?? null, numItems: 2048 })
+    const newCount = count + page.page.length
+    if (page.isDone) {
+      const existing = await ctx.db.query('counters').withIndex('by_name', q => q.eq('name', 'alerts_active')).first()
+      if (existing) {
+        await ctx.db.patch(existing._id, { value: newCount })
+      } else {
+        await ctx.db.insert('counters', { name: 'alerts_active', value: newCount })
+      }
+      return { done: true, count: newCount }
+    }
+    return { done: false, cursor: page.continueCursor, count: newCount }
+  },
+})
+
+// Action that paginates through all alerts to rebuild the counter accurately
+export const rebuildAlertCounter = action({
   args: {},
   handler: async (ctx) => {
-    const rows = await ctx.db.query('alerts')
-      .withIndex('by_dismissed', q => q.eq('dismissed', false))
-      .take(8192)
-    const existing = await ctx.db.query('counters').withIndex('by_name', q => q.eq('name', 'alerts_active')).first()
-    if (existing) {
-      await ctx.db.patch(existing._id, { value: rows.length })
-    } else {
-      await ctx.db.insert('counters', { name: 'alerts_active', value: rows.length })
+    let cursor: string | undefined = undefined
+    let count = 0
+    let done = false
+    while (!done) {
+      const result: { done: boolean; count: number; cursor?: string } = await ctx.runMutation(internal.sites.rebuildAlertCounterPage, { cursor, count })
+      count = result.count
+      done = result.done
+      if (!done) cursor = result.cursor
     }
-    return rows.length
+    return count
   },
 })
 
