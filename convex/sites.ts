@@ -354,10 +354,6 @@ export const listAlerts = query({
 export const countAlerts = query({
   args: { dismissed: v.optional(v.boolean()) },
   handler: async (ctx, { dismissed = false }) => {
-    const name = dismissed ? 'alerts_dismissed' : 'alerts_active'
-    const counter = await ctx.db.query('counters').withIndex('by_name', q => q.eq('name', name)).first()
-    if (counter !== null) return counter.value
-    // Fallback if counter not yet initialized
     const rows = await ctx.db.query('alerts')
       .withIndex('by_dismissed', q => q.eq('dismissed', dismissed))
       .take(16384)
