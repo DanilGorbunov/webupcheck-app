@@ -478,7 +478,7 @@ export function AlertsPage({ onViewSite }: Props) {
       {/* Header — sticky */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 24px', background: 'white', borderBottom: '1px solid #E2E8F0', flexShrink: 0, flexWrap: 'wrap' as const }}>
         <h1 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', letterSpacing: -0.3, flexShrink: 0 }}>
-          Alerts <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 400 }}>({totalAlertCount ?? alerts.length}{filtered.length < (totalAlertCount ?? alerts.length) ? ` shown: ${filtered.length}` : ''})</span>
+          Alerts <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 400 }}>({totalAlertCount ?? alerts.length})</span>
         </h1>
 
         {/* Severity dropdown */}
