@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback, useRef, memo, useDeferredValue } from 'react'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 
@@ -9,36 +9,58 @@ type DbAlert = any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ConvexId = any
 
-const listAlertsFn     = makeFunctionReference<'query',    { dismissed?: boolean; limit?: number }, DbAlert[]>('sites:listAlerts')
-const dismissAlertFn   = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
-const dismissAllFn     = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
-const reverifyAlertsFn = makeFunctionReference<'action',   Record<string, never>, { dismissed: number; stillDead: number; total: number }>('checker:reverifyAlerts')
+const listAlertsFn          = makeFunctionReference<'query',    { dismissed?: boolean; limit?: number }, DbAlert[]>('sites:listAlerts')
+const countAlertsFn         = makeFunctionReference<'query',    { dismissed?: boolean }, number>('sites:countAlerts')
+const dismissAllFn          = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
+const reverifyAlertsFn      = makeFunctionReference<'action',   Record<string, never>, { dismissed: number; stillDead: number; total: number }>('checker:reverifyAlerts')
+const updateWorkflowFn      = makeFunctionReference<'mutation', { alertId: ConvexId; workflowStatus: string }, void>('sites:updateAlertWorkflow')
+const dismissAlertFn        = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
+const markBotBlockedDownFn  = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:markBotBlockedAsDown')
 
 interface Props { onViewSite: (s: DbSite) => void }
 
-type Tab = 'all' | 'critical' | 'dead' | 'warning' | 'dismissed'
+type WorkflowCol = 'new' | 'urgent' | 'in_progress' | 'done'
 
-// HTTP error codes with descriptions shown in filter bar
-const HTTP_FILTERS: { code: string; label: string; color: string; desc: string }[] = [
-  { code: 'http 0',  label: 'HTTP 0',  color: '#DC2626', desc: 'No response — server unreachable or DNS failed' },
-  { code: 'http 502', label: 'HTTP 502', color: '#DC2626', desc: 'Bad Gateway — upstream server down' },
-  { code: 'http 503', label: 'HTTP 503', color: '#DC2626', desc: 'Service Unavailable — server overloaded or down' },
-  { code: 'http 504', label: 'HTTP 504', color: '#DC2626', desc: 'Gateway Timeout — no upstream response' },
-  { code: 'http 403', label: 'HTTP 403', color: '#D97706', desc: 'Forbidden — bot protection (site is alive)' },
-  { code: 'http 429', label: 'HTTP 429', color: '#D97706', desc: 'Rate Limited — too many requests (site is alive)' },
-  { code: 'http 406', label: 'HTTP 406', color: '#D97706', desc: 'Not Acceptable — header mismatch (site is alive)' },
-  { code: 'http 404', label: 'HTTP 404', color: '#D97706', desc: 'Not Found — page missing, server alive' },
-  { code: 'redirects', label: 'Redirect', color: '#6B7280', desc: 'HTTP 301/302 redirect detected' },
-  { code: 'parking page', label: 'Parked', color: '#94A3B8', desc: 'Domain for sale / empty parking page' },
-  { code: 'consecutive checks failed', label: 'Repeated fail', color: '#7C3AED', desc: '3+ checks failed in a row — confirmed down' },
+const COLUMNS: { id: WorkflowCol; label: string; color: string; bg: string; sub?: string }[] = [
+  { id: 'new',         label: 'New',              color: '#64748B', bg: '#F8FAFC' },
+  { id: 'urgent',      label: 'Urgent',           color: '#DC2626', bg: '#FFF5F5', sub: 'Dead / Critical' },
+  { id: 'in_progress', label: 'In Progress',      color: '#D97706', bg: '#FFFBEB' },
+  { id: 'done',        label: 'Fixed & Ignored',  color: '#16A34A', bg: '#F0FDF4' },
 ]
 
-const SEVERITY_STYLES = {
-  critical: { border: '#DC2626', bg: '#FFF5F5', dot: '#DC2626', label: 'CRITICAL', labelColor: '#DC2626', labelBg: '#FEE2E2' },
-  warning:  { border: '#D97706', bg: '#FFFBEB', dot: '#D97706', label: 'WARNING',  labelColor: '#92400E', labelBg: '#FEF3C7' },
-  info:     { border: '#2563EB', bg: '#EFF6FF', dot: '#2563EB', label: 'INFO',     labelColor: '#1D4ED8', labelBg: '#DBEAFE' },
+// legacy values from old schema map to new columns
+function normalizeCol(val: string | undefined): WorkflowCol {
+  if (val === 'fixed' || val === 'ignored' || val === 'done') return 'done'
+  if (val === 'urgent') return 'urgent'
+  if (val === 'in_progress') return 'in_progress'
+  return 'new'
 }
-const ICONS = { critical: '🔴', warning: '⚠️', info: 'ℹ️' }
+
+const HTTP_FILTERS = [
+  { code: 'http 0',    label: 'HTTP 0' },
+  { code: 'http 404',  label: 'HTTP 404' },
+  { code: 'redirects', label: 'Redirect' },
+  { code: 'parking',   label: 'Parked' },
+]
+
+function getHttpCode(msg: string): string | null {
+  const m = msg.toLowerCase()
+  if (m.includes('http 0')) return 'HTTP 0'
+  if (m.includes('http 404')) return 'HTTP 404'
+  if (m.includes('redirect')) return 'Redirect'
+  if (m.includes('parking') || m.includes('parked')) return 'Parked'
+  const match = m.match(/http (\d+)/)
+  if (match) return `HTTP ${match[1]}`
+  return null
+}
+
+function getSeverityStyle(a: DbAlert) {
+  const dead = (a.message ?? '').toLowerCase().includes('http 0') || (a.message ?? '').toLowerCase().includes('consecutive')
+  if (dead) return { label: 'DEAD', color: '#DC2626', bg: '#FEE2E2', border: '#DC2626' }
+  if (a.severity === 'critical') return { label: 'CRITICAL', color: '#DC2626', bg: '#FEE2E2', border: '#DC2626' }
+  if (a.severity === 'warning') return { label: 'WARNING', color: '#92400E', bg: '#FEF3C7', border: '#D97706' }
+  return { label: 'INFO', color: '#1D4ED8', bg: '#DBEAFE', border: '#2563EB' }
+}
 
 function formatRelTime(ts: number): string {
   const diff = Date.now() - ts
@@ -50,294 +72,519 @@ function formatRelTime(ts: number): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-function isDead(a: DbAlert): boolean {
-  const msg = (a.message ?? '').toLowerCase()
-  if (msg.includes('(http 0)') || msg.includes('http 0)')) return true
-  if (msg.includes('parking page detected')) return true
-  if (/\d+ consecutive checks failed/.test(msg)) return true
-  return false
+type DragOverCard = { id: string; pos: 'before' | 'after' }
+
+const KanbanCard = memo(function KanbanCard({ alert, onDragStart, onViewSite, col, isOverBefore, isOverAfter, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown }: {
+  alert: DbAlert
+  onDragStart: (id: string) => void
+  onViewSite: (s: DbSite) => void
+  col?: WorkflowCol
+  isOverBefore: boolean
+  isOverAfter: boolean
+  onDismiss: (id: string) => void
+  onMarkDown: (id: string) => void
+  onCardDragOver: (id: string, pos: 'before' | 'after') => void
+  onCardDragLeave: () => void
+}) {
+  const st = getSeverityStyle(alert)
+  const httpCode = getHttpCode(alert.message ?? '')
+  const doneTag = col === 'done'
+    ? (alert.workflowStatus === 'ignored' ? 'Ignored' : 'Fixed')
+    : null
+
+  return (
+    <div
+      onDragOver={e => {
+        e.preventDefault()
+        e.stopPropagation()
+        const rect = e.currentTarget.getBoundingClientRect()
+        onCardDragOver(alert._id, e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+      }}
+      onDragLeave={e => {
+        e.stopPropagation()
+        onCardDragLeave()
+      }}
+    >
+      {isOverBefore && (
+        <div style={{ height: 2, background: '#2563EB', borderRadius: 1, margin: '0 2px 4px' }} />
+      )}
+      <div
+        draggable
+        onDragStart={() => onDragStart(alert._id)}
+        style={{
+          background: 'white',
+          border: `1px solid #E2E8F0`,
+          borderLeft: `3px solid ${st.border}`,
+          borderRadius: 6,
+          padding: '10px 12px',
+          marginBottom: 6,
+          cursor: 'grab',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          userSelect: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
+          <a
+            href={`https://${alert.domain}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', textDecoration: 'none', lineHeight: 1.3 }}
+            onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+            onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+            onClick={e => e.stopPropagation()}
+          >
+            {alert.domain}
+          </a>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 3, background: st.bg, color: st.color, flexShrink: 0 }}>
+            {st.label}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: httpCode || doneTag ? 4 : 0 }}>
+          {httpCode && (
+            <span style={{ fontSize: 10, color: '#6B7280', background: '#F1F5F9', padding: '1px 5px', borderRadius: 3 }}>
+              {httpCode}
+            </span>
+          )}
+          {doneTag && (
+            <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: doneTag === 'Fixed' ? '#D1FAE5' : '#F1F5F9', color: doneTag === 'Fixed' ? '#065F46' : '#64748B' }}>
+              {doneTag}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: '#64748B', lineHeight: 1.4 }}>{alert.message}</div>
+        {alert.subdomains && alert.subdomains.length > 0 && (
+          <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 3 }}>↳ {(alert.subdomains as string[]).join(', ')}</div>
+        )}
+        {alert.aiCategory !== 'bot_blocked' && (alert.aiCategory || alert.aiReason) && (
+          <div style={{ marginTop: 6, padding: '5px 7px', background: '#F8FAFC', borderRadius: 4, borderLeft: '2px solid #6366F1' }}>
+            {alert.aiCategory && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: alert.aiReason ? 2 : 0 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {alert.aiCategory.replace(/_/g, ' ')}
+                </span>
+                {alert.aiPriority != null && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3,
+                    background: alert.aiPriority >= 70 ? '#FEE2E2' : alert.aiPriority >= 40 ? '#FEF3C7' : '#F0FDF4',
+                    color:      alert.aiPriority >= 70 ? '#DC2626' : alert.aiPriority >= 40 ? '#92400E' : '#16A34A',
+                  }}>
+                    P{alert.aiPriority}
+                  </span>
+                )}
+              </div>
+            )}
+            {alert.aiReason && (
+              <div style={{ fontSize: 10, color: '#64748B', lineHeight: 1.4 }}>{alert.aiReason}</div>
+            )}
+          </div>
+        )}
+        {alert.aiCategory === 'bot_blocked' && (
+          <div style={{ marginTop: 7, padding: '6px 8px', background: '#FFFBEB', borderRadius: 4, border: '1px solid #FDE68A' }}>
+            <div style={{ fontSize: 10, color: '#92400E', marginBottom: 6, fontWeight: 500 }}>
+              Our checker was blocked. Open the site and check if it works normally.
+            </div>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <a
+                href={`https://${alert.domain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: 600, padding: '4px 6px', background: 'white', border: '1px solid #D1D5DB', borderRadius: 4, color: '#374151', textDecoration: 'none', cursor: 'pointer' }}
+              >
+                Open Site →
+              </a>
+              <button
+                onClick={e => { e.stopPropagation(); onDismiss(alert._id) }}
+                style={{ flex: 1, fontSize: 10, fontWeight: 600, padding: '4px 6px', background: '#D1FAE5', border: '1px solid #6EE7B7', borderRadius: 4, color: '#065F46', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                ✓ Working
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); onMarkDown(alert._id) }}
+                style={{ flex: 1, fontSize: 10, fontWeight: 600, padding: '4px 6px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 4, color: '#991B1B', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                ✗ Down
+              </button>
+            </div>
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+          <span style={{ fontSize: 10, color: '#94A3B8' }}>{formatRelTime(alert.createdAt)}</span>
+          <button
+            onClick={() => onViewSite({ _id: alert.siteId, domain: alert.domain })}
+            style={{ fontSize: 10, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+          >
+            View →
+          </button>
+        </div>
+      </div>
+      {isOverAfter && (
+        <div style={{ height: 2, background: '#2563EB', borderRadius: 1, margin: '0 2px 4px' }} />
+      )}
+    </div>
+  )
+})
+
+const COL_PAGE = 30
+
+function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, onViewSite, isDragOver, onDragOver, onDragLeave, onDragStart, dragOverCard, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown }: {
+  col: typeof COLUMNS[0]
+  alerts: DbAlert[]
+  visibleCount: number
+  onShowMore: () => void
+  onDrop: (colId: WorkflowCol) => void
+  onViewSite: (s: DbSite) => void
+  isDragOver: boolean
+  onDragOver: () => void
+  onDragLeave: () => void
+  onDragStart: (id: string) => void
+  dragOverCard: DragOverCard | null
+  onCardDragOver: (id: string, pos: 'before' | 'after') => void
+  onCardDragLeave: () => void
+  onDismiss: (id: string) => void
+  onMarkDown: (id: string) => void
+}) {
+  const visible = alerts.slice(0, visibleCount)
+  const remaining = alerts.length - visibleCount
+
+  return (
+    <div
+      onDragOver={e => { e.preventDefault(); onDragOver() }}
+      onDragLeave={onDragLeave}
+      onDrop={e => { e.preventDefault(); onDrop(col.id) }}
+      style={{
+        flex: 1,
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: isDragOver ? col.bg : '#F8FAFC',
+        border: `2px dashed ${isDragOver ? col.color : '#E2E8F0'}`,
+        borderRadius: 8,
+        padding: '12px 10px',
+        transition: 'background 0.15s, border-color 0.15s',
+        minHeight: 0,
+      }}
+    >
+      <div style={{ marginBottom: 12, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{col.label}</span>
+          <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 'auto' }}>{alerts.length}</span>
+        </div>
+        {col.sub && <div style={{ fontSize: 10, color: col.color, opacity: 0.7, paddingLeft: 14, marginTop: 2 }}>{col.sub}</div>}
+      </div>
+      <div style={{ overflowY: 'auto', flex: 1 }}>
+        {visible.map(a => (
+          <KanbanCard
+            key={a._id}
+            alert={a}
+            col={col.id}
+            onDragStart={onDragStart}
+            onViewSite={onViewSite}
+            isOverBefore={dragOverCard?.id === a._id && dragOverCard?.pos === 'before'}
+            isOverAfter={dragOverCard?.id === a._id && dragOverCard?.pos === 'after'}
+            onCardDragOver={onCardDragOver}
+            onCardDragLeave={onCardDragLeave}
+            onDismiss={onDismiss}
+            onMarkDown={onMarkDown}
+          />
+        ))}
+        {remaining > 0 && (
+          <button
+            onClick={onShowMore}
+            style={{ width: '100%', padding: '8px 0', marginTop: 4, background: 'white', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 11, fontWeight: 600, color: '#64748B', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            Show {Math.min(remaining, COL_PAGE)} more · {remaining} left
+          </button>
+        )}
+        {alerts.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#CBD5E1', fontSize: 12, paddingTop: 40 }}>Drop here</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function AlertsPage({ onViewSite }: Props) {
-  const [tab, setTab]           = useState<Tab>('all')
-  const [searchQuery, setSearchQuery] = useState('')
   const [httpFilter, setHttpFilter] = useState<string | null>(null)
-  const [activeLimit, setActiveLimit]       = useState(500)
-  const [dismissedLimit, setDismissedLimit] = useState(500)
-  const [reverifying, setReverifying]       = useState(false)
-  const [reverifyResult, setReverifyResult] = useState<{ dismissed: number; stillDead: number; total: number } | null>(null)
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null)
+  const [severityOpen, setSeverityOpen] = useState(false)
+  const [search, setSearch] = useState('')
 
-  const activeAlerts    = useQuery(listAlertsFn, { dismissed: false, limit: activeLimit }) ?? []
-  const dismissedAlerts = useQuery(listAlertsFn, { dismissed: true,  limit: dismissedLimit }) ?? []
-  const undismissedCount = activeAlerts.length
-  const dismissAlert    = useMutation(dismissAlertFn)
-  const dismissAll      = useMutation(dismissAllFn)
-  const reverifyAlerts  = useAction(reverifyAlertsFn)
+  const [reverifying, setReverifying] = useState(false)
+  const [reverifyResult, setReverifyResult] = useState<{ dismissed: number; stillDead: number } | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState<WorkflowCol | null>(null)
+  const [dragOverCard, setDragOverCard] = useState<DragOverCard | null>(null)
+  const [localOrder, setLocalOrder] = useState<Record<WorkflowCol, string[]> | null>(null)
+  const [colLimits, setColLimits] = useState<Record<WorkflowCol, number>>({ new: COL_PAGE, urgent: COL_PAGE, in_progress: COL_PAGE, done: COL_PAGE })
+  const rafRef = useRef<number | null>(null)
+
+  const totalAlertCount = useQuery(countAlertsFn, { dismissed: false }) ?? null
+  const alertsLive = useQuery(listAlertsFn, { dismissed: false, limit: 3000 }) ?? []
+  // Defer Kanban re-renders — React batches rapid updates during cron runs
+  const alerts = useDeferredValue(alertsLive)
+
+  function showMoreInCol(colId: WorkflowCol) {
+    setColLimits(prev => ({ ...prev, [colId]: prev[colId] + COL_PAGE }))
+  }
+  const resetColLimits = useCallback(() => {
+    setColLimits({ new: COL_PAGE, urgent: COL_PAGE, in_progress: COL_PAGE, done: COL_PAGE })
+  }, [])
+
+  const dismissAll = useMutation(dismissAllFn)
+  const reverifyAlerts = useAction(reverifyAlertsFn)
+  const updateWorkflow = useMutation(updateWorkflowFn)
+  const dismissAlert = useMutation(dismissAlertFn)
+  const markBotBlockedDown = useMutation(markBotBlockedDownFn)
+
+  const handleDismissOne = useCallback((id: string) => {
+    dismissAlert({ alertId: id as ConvexId })
+  }, [dismissAlert])
+
+  const handleMarkDown = useCallback((id: string) => {
+    markBotBlockedDown({ alertId: id as ConvexId })
+  }, [markBotBlockedDown])
 
   async function handleReverify() {
     setReverifying(true)
     setReverifyResult(null)
     try {
-      const result = await reverifyAlerts({})
-      setReverifyResult(result)
+      const r = await reverifyAlerts({})
+      setReverifyResult(r)
     } catch { /* ignore */ }
     setReverifying(false)
   }
 
-  const baseAlerts: DbAlert[] = tab === 'dismissed' ? dismissedAlerts : activeAlerts
+  // Throttled drag-over to avoid re-rendering 500 cards on every mouse pixel
+  const handleCardDragOver = useCallback((id: string, pos: 'before' | 'after') => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(() => {
+      setDragOverCard(prev => prev?.id === id && prev?.pos === pos ? prev : { id, pos })
+    })
+  }, [])
+  const handleCardDragLeave = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    setDragOverCard(null)
+  }, [])
 
-  const filtered = baseAlerts.filter((a: DbAlert) => {
+  // Count by HTTP code for header filters
+  const { codeCounts, deadCount, criticalCount, warningCount } = useMemo(() => {
+    const codeCounts: Record<string, number> = {}
+    let dead = 0, critical = 0, warning = 0
+    for (const a of alerts) {
+      const msg = (a.message ?? '').toLowerCase()
+      const filter = HTTP_FILTERS.find(f => msg.includes(f.code))
+      if (filter) codeCounts[filter.code] = (codeCounts[filter.code] ?? 0) + 1
+      const lbl = getSeverityStyle(a).label
+      if (lbl === 'DEAD') dead++
+      else if (lbl === 'CRITICAL') critical++
+      else if (lbl === 'WARNING') warning++
+    }
+    return { codeCounts, deadCount: dead, criticalCount: critical, warningCount: warning }
+  }, [alerts])
+
+  // Apply filters
+  const filtered = useMemo(() => alerts.filter(a => {
     const msg = (a.message ?? '').toLowerCase()
-    // Tab filter
-    if (tab === 'critical') { if (!isDead(a)) return false }
-    if (tab === 'dead')     { if (!isDead(a)) return false }
-    if (tab === 'warning')  { if (a.severity !== 'warning') return false }
-    // HTTP code filter
-    if (httpFilter) { if (!msg.includes(httpFilter)) return false }
-    // Search filter
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
+    if (httpFilter && !msg.includes(httpFilter)) return false
+    if (severityFilter) {
+      const label = getSeverityStyle(a).label
+      if (severityFilter === 'dead' && label !== 'DEAD') return false
+      if (severityFilter === 'critical' && label !== 'CRITICAL') return false
+      if (severityFilter === 'warning' && label !== 'WARNING') return false
+    }
+    if (search) {
+      const q = search.toLowerCase()
       if (!a.domain?.toLowerCase().includes(q) && !msg.includes(q)) return false
     }
     return true
-  })
+  }), [alerts, httpFilter, severityFilter, search])
 
-  const deadCount    = activeAlerts.filter(isDead).length
-  const warningCount = activeAlerts.filter((a: DbAlert) => a.severity === 'warning').length
+  // Group by workflow status (server truth)
+  const byCol = useMemo(() => {
+    const cols: Record<WorkflowCol, DbAlert[]> = { new: [], urgent: [], in_progress: [], done: [] }
+    for (const a of filtered) {
+      if (a.workflowStatus) {
+        cols[normalizeCol(a.workflowStatus)].push(a)
+      } else {
+        const sev = getSeverityStyle(a).label
+        cols[sev === 'DEAD' || sev === 'CRITICAL' ? 'urgent' : 'new'].push(a)
+      }
+    }
+    return cols
+  }, [filtered])
 
-  const TAB_STYLE = (t: Tab) => ({
-    padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer',
-    fontSize: 13, fontWeight: tab === t ? 600 : 400,
-    color: tab === t ? '#0F172A' : '#6B7280',
-    borderBottom: `2px solid ${tab === t ? '#2563EB' : 'transparent'}`,
-    fontFamily: 'inherit', marginBottom: -1,
-    display: 'flex', alignItems: 'center', gap: 5,
-  })
+  // Apply local ordering on top of server grouping
+  const displayCols = useMemo(() => {
+    const cols: Record<WorkflowCol, DbAlert[]> = { new: [], urgent: [], in_progress: [], done: [] }
+    for (const colId of COLUMNS.map(c => c.id)) {
+      if (!localOrder) {
+        cols[colId] = byCol[colId]
+      } else {
+        const alertMap = new Map(byCol[colId].map((a: DbAlert) => [a._id, a]))
+        const ordered = localOrder[colId].filter(id => alertMap.has(id)).map(id => alertMap.get(id)!)
+        const newOnes = byCol[colId].filter((a: DbAlert) => !localOrder[colId].includes(a._id))
+        cols[colId] = [...ordered, ...newOnes]
+      }
+    }
+    return cols
+  }, [byCol, localOrder])
 
-  const badge = (n: number, color = '#FEE2E2', text = '#DC2626') => n > 0 ? (
-    <span style={{ background: color, color: text, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>{n}</span>
-  ) : null
+  async function handleDrop(targetCol: WorkflowCol) {
+    if (!dragId) return
+    setDragOver(null)
+
+    // Find source column
+    const sourceCol = COLUMNS.map(c => c.id).find(col =>
+      displayCols[col].some((a: DbAlert) => a._id === dragId)
+    ) ?? 'new'
+
+    // Compute insert position in target column
+    const targetList = displayCols[targetCol].filter((a: DbAlert) => a._id !== dragId).map((a: DbAlert) => a._id)
+    if (dragOverCard) {
+      const idx = displayCols[targetCol].findIndex((a: DbAlert) => a._id === dragOverCard.id)
+      const insertAt = dragOverCard.pos === 'after' ? idx + 1 : idx
+      // adjust for removed dragId
+      const dragIdxInTarget = displayCols[targetCol].findIndex((a: DbAlert) => a._id === dragId)
+      const adj = dragIdxInTarget !== -1 && dragIdxInTarget < insertAt ? insertAt - 1 : insertAt
+      targetList.splice(Math.max(0, adj), 0, dragId)
+    } else {
+      targetList.unshift(dragId)
+    }
+
+    // Build new local order (remove dragId from all, set target)
+    const newLocalOrder: Record<WorkflowCol, string[]> = {
+      new:         displayCols.new.map((a: DbAlert) => a._id).filter((id: string) => id !== dragId),
+      urgent:      displayCols.urgent.map((a: DbAlert) => a._id).filter((id: string) => id !== dragId),
+      in_progress: displayCols.in_progress.map((a: DbAlert) => a._id).filter((id: string) => id !== dragId),
+      done:        displayCols.done.map((a: DbAlert) => a._id).filter((id: string) => id !== dragId),
+    }
+    newLocalOrder[targetCol] = targetList
+    setLocalOrder(newLocalOrder)
+    setDragOverCard(null)
+
+    // Persist column change to DB
+    if (sourceCol !== targetCol) {
+      await updateWorkflow({ alertId: dragId as ConvexId, workflowStatus: targetCol })
+    }
+
+    setDragId(null)
+  }
 
   return (
-    <div style={{ padding: '26px 28px', background: '#F8FAFC', minHeight: '100%' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0F172A', letterSpacing: -0.4 }}>Alerts</h1>
-          <p style={{ fontSize: 12.5, color: '#64748B', marginTop: 3 }}>
-            {undismissedCount > 0 ? `${undismissedCount} active alerts across your network` : 'No active alerts'}
-          </p>
-        </div>
-        {undismissedCount > 0 && tab !== 'dismissed' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {reverifyResult && (
-              <span style={{ fontSize: 12, color: '#16A34A', fontWeight: 500 }}>
-                ✓ {reverifyResult.dismissed} false positives removed · {reverifyResult.stillDead} confirmed dead
-              </span>
-            )}
-            <button
-              onClick={handleReverify}
-              disabled={reverifying}
-              style={{ padding: '7px 14px', background: reverifying ? '#F1F5F9' : '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: reverifying ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              {reverifying
-                ? <><span style={{ width: 12, height: 12, border: '2px solid #BFDBFE', borderTopColor: '#2563EB', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} /> Re-verifying…</>
-                : '🔄 Re-verify All'
-              }
-            </button>
-            <button
-              onClick={() => dismissAll({})}
-              style={{ padding: '7px 14px', background: 'white', color: '#6B7280', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              Dismiss All ({undismissedCount})
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Header — sticky */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 24px', background: 'white', borderBottom: '1px solid #E2E8F0', flexShrink: 0, flexWrap: 'wrap' as const }}>
+        <h1 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', letterSpacing: -0.3, flexShrink: 0 }}>
+          Alerts <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 400 }}>({totalAlertCount ?? alerts.length}{filtered.length < (totalAlertCount ?? alerts.length) ? ` shown: ${filtered.length}` : ''})</span>
+        </h1>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #E2E8F0', marginBottom: 14 }}>
-        <button style={TAB_STYLE('all')} onClick={() => setTab('all')}>
-          All {badge(undismissedCount)}
-        </button>
-        <button style={TAB_STYLE('dead')} onClick={() => setTab('dead')}>
-          Dead {badge(deadCount)}
-        </button>
-        <button style={TAB_STYLE('critical')} onClick={() => setTab('critical')}>
-          Critical {badge(activeAlerts.filter((a: DbAlert) => a.severity === 'critical').length)}
-        </button>
-        <button style={TAB_STYLE('warning')} onClick={() => setTab('warning')}>
-          Warning {badge(warningCount, '#FEF3C7', '#92400E')}
-        </button>
-        <button style={TAB_STYLE('dismissed')} onClick={() => setTab('dismissed')}>
-          Dismissed
-        </button>
-      </div>
-
-      {/* Search */}
-      <div style={{ position: 'relative', marginBottom: 14 }}>
-        <svg style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search by domain or message…"
-          style={{ width: '100%', padding: '9px 12px 9px 34px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13.5, outline: 'none', fontFamily: 'inherit', color: '#1E293B', background: 'white', boxSizing: 'border-box' }}
-          onFocus={e => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.08)' }}
-          onBlur={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = 'none' }}
-        />
-        {searchQuery && (
-          <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: 16, lineHeight: 1, padding: 2 }}>✕</button>
-        )}
-      </div>
-
-      {/* HTTP Error Code Filters */}
-      <div style={{ marginBottom: 16, background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 14px' }}>
-        <div style={{ fontSize: 10.5, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-          Filter by error code
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+        {/* Severity dropdown */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
-            onClick={() => setHttpFilter(null)}
-            style={{
-              padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-              border: `1px solid ${httpFilter === null ? '#2563EB' : '#E2E8F0'}`,
-              background: httpFilter === null ? '#EFF6FF' : 'white',
-              color: httpFilter === null ? '#2563EB' : '#6B7280',
-              fontFamily: 'inherit',
-            }}
+            onClick={() => setSeverityOpen(o => !o)}
+            style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid #E2E8F0', background: severityFilter ? '#FEE2E2' : 'white', color: severityFilter ? '#DC2626' : '#374151', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            {severityFilter === 'dead' ? `DEAD (${deadCount})` : severityFilter === 'critical' ? `CRITICAL (${criticalCount})` : severityFilter === 'warning' ? `WARNING (${warningCount})` : 'Severity'} ▾
+          </button>
+          {severityOpen && (
+            <div
+              style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 160, overflow: 'hidden' }}
+              onMouseLeave={() => setSeverityOpen(false)}
+            >
+              {[
+                { key: null,       label: 'All severities', count: alerts.length,  color: '#374151' },
+                { key: 'dead',     label: 'DEAD',           count: deadCount,      color: '#DC2626' },
+                { key: 'critical', label: 'CRITICAL',       count: criticalCount,  color: '#DC2626' },
+                { key: 'warning',  label: 'WARNING',        count: warningCount,   color: '#92400E' },
+              ].map(opt => (
+                <button
+                  key={opt.label}
+                  onClick={() => { setSeverityFilter(opt.key); setSeverityOpen(false); resetColLimits() }}
+                  style={{ width: '100%', padding: '8px 14px', background: severityFilter === opt.key ? '#F8FAFC' : 'white', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: opt.color, textAlign: 'left', display: 'flex', justifyContent: 'space-between' }}
+                >
+                  <span>{opt.label}</span>
+                  <span style={{ color: '#94A3B8', fontWeight: 400 }}>{opt.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* HTTP code filters */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' as const }}>
+          <button
+            onClick={() => { setHttpFilter(null); resetColLimits() }}
+            style={{ padding: '3px 9px', borderRadius: 12, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid', borderColor: !httpFilter ? '#2563EB' : '#E2E8F0', background: !httpFilter ? '#EFF6FF' : 'white', color: !httpFilter ? '#2563EB' : '#6B7280', fontFamily: 'inherit' }}
           >
             All codes
           </button>
-          {HTTP_FILTERS.map(f => {
-            const count = activeAlerts.filter((a: DbAlert) => (a.message ?? '').toLowerCase().includes(f.code)).length
-            if (count === 0 && tab !== 'dismissed') return null
-            const active = httpFilter === f.code
-            return (
-              <button
-                key={f.code}
-                onClick={() => setHttpFilter(active ? null : f.code)}
-                title={f.desc}
-                style={{
-                  padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  border: `1px solid ${active ? f.color : '#E2E8F0'}`,
-                  background: active ? `${f.color}15` : 'white',
-                  color: active ? f.color : '#374151',
-                  fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: f.color, flexShrink: 0 }} />
-                {f.label}
-                <span style={{ fontSize: 10, fontWeight: 700, color: f.color }}>{count}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Description of selected filter */}
-        {httpFilter && (
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #F1F5F9', fontSize: 12, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            {HTTP_FILTERS.find(f => f.code === httpFilter)?.desc}
-          </div>
-        )}
-      </div>
-
-      {/* Results count */}
-      <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>
-        Showing {filtered.length.toLocaleString()} of {(tab === 'dismissed' ? dismissedAlerts : activeAlerts).length.toLocaleString()} alerts
-      </div>
-
-      {/* Alert list */}
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '80px 24px' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#0F172A', marginBottom: 6 }}>
-            {tab === 'dismissed' ? 'No dismissed alerts' : httpFilter ? 'No alerts match this filter' : 'No active alerts'}
-          </div>
-          <div style={{ fontSize: 13, color: '#6B7280' }}>
-            {tab === 'dismissed' ? 'Dismissed alerts will appear here' : 'Everything looks good across your network'}
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {filtered.map((alert: DbAlert) => {
-            const sev = (alert.severity ?? 'info') as keyof typeof SEVERITY_STYLES
-            const st  = SEVERITY_STYLES[sev] ?? SEVERITY_STYLES.info
-            const dead = isDead(alert)
-            return (
-              <div
-                key={alert._id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '12px 16px',
-                  borderLeft: `3px solid ${dead ? '#DC2626' : st.border}`,
-                  background: st.bg,
-                  borderRadius: '0 8px 8px 0',
-                  opacity: alert.dismissed ? 0.6 : 1,
-                }}
-              >
-                <span style={{ fontSize: 18, flexShrink: 0, width: 24, textAlign: 'center' }}>
-                  {dead ? '💀' : ICONS[sev] ?? 'ℹ️'}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
-                    <a href={`https://${alert.domain}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', textDecoration: 'none' }} onMouseEnter={e => (e.currentTarget.style.textDecoration='underline')} onMouseLeave={e => (e.currentTarget.style.textDecoration='none')}>{alert.domain}</a>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: st.labelBg, color: st.labelColor }}>
-                      {dead ? 'DEAD' : st.label}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12.5, color: '#374151' }}>{alert.message}</div>
-                  {alert.subdomains && alert.subdomains.length > 0 && (
-                    <div style={{ fontSize: 11, color: '#6B7280', marginTop: 3 }}>
-                      ↳ Subdomains: {(alert.subdomains as string[]).join(', ')}
-                    </div>
-                  )}
-                </div>
-                <span style={{ fontSize: 11.5, color: '#94A3B8', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {formatRelTime(alert.createdAt)}
-                </span>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button
-                    onClick={() => onViewSite({ _id: alert.siteId, domain: alert.domain })}
-                    style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: '#374151', cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}
-                  >
-                    View
-                  </button>
-                  {!alert.dismissed && (
-                    <button
-                      onClick={() => dismissAlert({ alertId: alert._id })}
-                      style={{ padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 5, background: 'white', fontSize: 12, color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit' }}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Load more */}
-      {(() => {
-        const currentList = tab === 'dismissed' ? dismissedAlerts : activeAlerts
-        const currentLimit = tab === 'dismissed' ? dismissedLimit : activeLimit
-        const setLimit = tab === 'dismissed' ? setDismissedLimit : setActiveLimit
-        if (currentList.length < currentLimit) return null
-        return (
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
+          {HTTP_FILTERS.filter(f => (codeCounts[f.code] ?? 0) > 0).map(f => (
             <button
-              onClick={() => setLimit(l => l + 500)}
-              style={{ padding: '8px 24px', background: 'white', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, color: '#374151', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}
+              key={f.code}
+              onClick={() => { setHttpFilter(httpFilter === f.code ? null : f.code); resetColLimits() }}
+              style={{ padding: '3px 9px', borderRadius: 12, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid', borderColor: httpFilter === f.code ? '#DC2626' : '#E2E8F0', background: httpFilter === f.code ? '#FEE2E2' : 'white', color: httpFilter === f.code ? '#DC2626' : '#374151', fontFamily: 'inherit' }}
             >
-              Load more ({currentList.length} shown)
+              {f.label} · {codeCounts[f.code] ?? 0}
             </button>
-          </div>
-        )
-      })()}
+          ))}
+        </div>
+
+        {/* Search */}
+        <input
+          value={search}
+          onChange={e => { setSearch(e.target.value); resetColLimits() }}
+          placeholder="Search domain…"
+          style={{ flex: 1, minWidth: 120, maxWidth: 220, padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 16, fontSize: 12, outline: 'none', fontFamily: 'inherit', background: 'white' }}
+        />
+
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          {reverifyResult && (
+            <span style={{ fontSize: 11, color: '#16A34A', fontWeight: 500 }}>
+              ✓ {reverifyResult.dismissed} removed
+            </span>
+          )}
+          <button
+            onClick={handleReverify}
+            disabled={reverifying}
+            style={{ padding: '5px 12px', background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: reverifying ? 'default' : 'pointer', opacity: reverifying ? 0.7 : 1, fontFamily: 'inherit' }}
+          >
+            {reverifying ? 'Checking…' : '🔄 Re-verify'}
+          </button>
+          <button
+            onClick={() => confirm(`Dismiss all ${alerts.length} alerts?`) && dismissAll({})}
+            style={{ padding: '5px 12px', background: 'white', color: '#6B7280', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            Dismiss All ({alerts.length})
+          </button>
+        </div>
+      </div>
+
+      {/* Kanban board */}
+      <div style={{ display: 'flex', gap: 12, flex: 1, alignItems: 'stretch', padding: '16px 24px', overflow: 'hidden' }}>
+        {COLUMNS.map(col => (
+          <KanbanColumn
+            key={col.id}
+            col={col}
+            alerts={displayCols[col.id]}
+            visibleCount={colLimits[col.id]}
+            onShowMore={() => showMoreInCol(col.id)}
+            onDrop={handleDrop}
+            onViewSite={onViewSite}
+            isDragOver={dragOver === col.id}
+            onDragOver={() => setDragOver(col.id)}
+            onDragLeave={() => setDragOver(null)}
+            onDragStart={setDragId}
+            dragOverCard={dragOverCard}
+            onCardDragOver={handleCardDragOver}
+            onCardDragLeave={handleCardDragLeave}
+            onDismiss={handleDismissOne}
+            onMarkDown={handleMarkDown}
+          />
+        ))}
+      </div>
     </div>
   )
 }
