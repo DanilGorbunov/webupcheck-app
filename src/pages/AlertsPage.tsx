@@ -231,6 +231,21 @@ const KanbanCard = memo(function KanbanCard({ alert, onDragStart, onViewSite, co
 
 const COL_PAGE = 30
 
+const NEW_COL_TABS = [
+  { key: null,       label: 'All' },
+  { key: 'http 403', label: 'HTTP 403' },
+  { key: 'http 404', label: 'HTTP 404' },
+  { key: 'http 5',   label: 'HTTP 5xx' },
+  { key: 'redirect', label: 'Redirect' },
+  { key: 'park',     label: 'Parked' },
+]
+
+const URGENT_COL_TABS = [
+  { key: null,       label: 'All' },
+  { key: 'dead',     label: 'DEAD' },
+  { key: 'critical', label: 'CRITICAL' },
+]
+
 function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, onViewSite, isDragOver, onDragOver, onDragLeave, onDragStart, dragOverCard, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown }: {
   col: typeof COLUMNS[0]
   alerts: DbAlert[]
@@ -248,8 +263,40 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, onViewSit
   onDismiss: (id: string) => void
   onMarkDown: (id: string) => void
 }) {
-  const visible = alerts.slice(0, visibleCount)
-  const remaining = alerts.length - visibleCount
+  const [subTab, setSubTab] = useState<string | null>(null)
+
+  const tabs = col.id === 'new' ? NEW_COL_TABS : col.id === 'urgent' ? URGENT_COL_TABS : null
+
+  const filteredAlerts = useMemo(() => {
+    if (!subTab) return alerts
+    return alerts.filter(a => {
+      const m = (a.message ?? '').toLowerCase()
+      const sev = getSeverityStyle(a).label.toLowerCase()
+      if (subTab === 'dead') return sev === 'dead'
+      if (subTab === 'critical') return sev === 'critical'
+      return m.includes(subTab)
+    })
+  }, [alerts, subTab])
+
+  const tabCounts = useMemo(() => {
+    if (!tabs) return {}
+    const counts: Record<string, number> = {}
+    for (const a of alerts) {
+      const m = (a.message ?? '').toLowerCase()
+      const sev = getSeverityStyle(a).label.toLowerCase()
+      for (const t of tabs) {
+        if (!t.key) continue
+        const match = t.key === 'dead' ? sev === 'dead'
+          : t.key === 'critical' ? sev === 'critical'
+          : m.includes(t.key)
+        if (match) counts[t.key] = (counts[t.key] ?? 0) + 1
+      }
+    }
+    return counts
+  }, [alerts, tabs])
+
+  const visible = filteredAlerts.slice(0, visibleCount)
+  const remaining = filteredAlerts.length - visibleCount
 
   return (
     <div
@@ -269,13 +316,32 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, onViewSit
         minHeight: 0,
       }}
     >
-      <div style={{ marginBottom: 12, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ marginBottom: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: tabs ? 8 : 0 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color, flexShrink: 0 }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{col.label}</span>
-          <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 'auto' }}>{alerts.length}</span>
+          <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 'auto' }}>{filteredAlerts.length}{subTab ? ` / ${alerts.length}` : ''}</span>
         </div>
         {col.sub && <div style={{ fontSize: 10, color: col.color, opacity: 0.7, paddingLeft: 14, marginTop: 2 }}>{col.sub}</div>}
+        {tabs && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const }}>
+            {tabs.filter(t => t.key === null || (tabCounts[t.key] ?? 0) > 0).map(t => (
+              <button
+                key={String(t.key)}
+                onClick={() => setSubTab(subTab === t.key ? null : t.key)}
+                style={{
+                  padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                  borderColor: subTab === t.key ? col.color : '#E2E8F0',
+                  background: subTab === t.key ? col.bg : 'white',
+                  color: subTab === t.key ? col.color : '#6B7280',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {t.label}{t.key ? ` · ${tabCounts[t.key] ?? 0}` : ''}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {visible.map(a => (
@@ -301,7 +367,7 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, onViewSit
             Show {Math.min(remaining, COL_PAGE)} more · {remaining} left
           </button>
         )}
-        {alerts.length === 0 && (
+        {filteredAlerts.length === 0 && (
           <div style={{ textAlign: 'center', color: '#CBD5E1', fontSize: 12, paddingTop: 40 }}>Drop here</div>
         )}
       </div>
