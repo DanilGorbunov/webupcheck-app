@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, memo, useDeferredValue } from 'react'
+import { useState, useMemo, useCallback, useRef, memo, useDeferredValue, useEffect } from 'react'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 
@@ -11,6 +11,7 @@ type ConvexId = any
 
 const listAlertsFn          = makeFunctionReference<'query',    { dismissed?: boolean; limit?: number }, DbAlert[]>('sites:listAlerts')
 const countAlertsFn         = makeFunctionReference<'query',    { dismissed?: boolean }, number>('sites:countAlerts')
+const alertStatsFn          = makeFunctionReference<'action',   Record<string, never>, { total: number; dead: number; critical: number; warning: number; http0: number; http404: number; http403: number; http429: number; http5xx: number; redirect: number; parked: number }>('sites:alertStats')
 const dismissAllFn          = makeFunctionReference<'mutation', Record<string, never>, number>('sites:dismissAllAlerts')
 const reverifyAlertsFn      = makeFunctionReference<'action',   Record<string, never>, { dismissed: number; stillDead: number; total: number }>('checker:reverifyAlerts')
 const updateWorkflowFn      = makeFunctionReference<'mutation', { alertId: ConvexId; workflowStatus: string }, void>('sites:updateAlertWorkflow')
@@ -37,10 +38,13 @@ function normalizeCol(val: string | undefined): WorkflowCol {
 }
 
 const HTTP_FILTERS = [
-  { code: 'http 0',    label: 'HTTP 0' },
-  { code: 'http 404',  label: 'HTTP 404' },
-  { code: 'redirects', label: 'Redirect' },
-  { code: 'parking',   label: 'Parked' },
+  { code: 'http 0',    label: 'HTTP 0',    statsKey: 'http0'    },
+  { code: 'http 403',  label: 'HTTP 403',  statsKey: 'http403'  },
+  { code: 'http 404',  label: 'HTTP 404',  statsKey: 'http404'  },
+  { code: 'http 429',  label: 'HTTP 429',  statsKey: 'http429'  },
+  { code: 'http 5',    label: 'HTTP 5xx',  statsKey: 'http5xx'  },
+  { code: 'redirect',  label: 'Redirect',  statsKey: 'redirect' },
+  { code: 'park',      label: 'Parked',    statsKey: 'parked'   },
 ]
 
 function getHttpCode(msg: string): string | null {
@@ -321,7 +325,9 @@ export function AlertsPage({ onViewSite }: Props) {
   const rafRef = useRef<number | null>(null)
 
   const totalAlertCount = useQuery(countAlertsFn, { dismissed: false }) ?? null
-  const alertsLive = useQuery(listAlertsFn, { dismissed: false, limit: 3000 }) ?? []
+  const runAlertStats = useAction(alertStatsFn)
+  const [backendStats, setBackendStats] = useState<{ total: number; dead: number; critical: number; warning: number; http0: number; http404: number; http403: number; http429: number; http5xx: number; redirect: number; parked: number } | null>(null)
+  const alertsLive = useQuery(listAlertsFn, { dismissed: false, limit: 16384 }) ?? []
   // Defer Kanban re-renders — React batches rapid updates during cron runs
   const alerts = useDeferredValue(alertsLive)
 
@@ -330,6 +336,10 @@ export function AlertsPage({ onViewSite }: Props) {
   }
   const resetColLimits = useCallback(() => {
     setColLimits({ new: COL_PAGE, urgent: COL_PAGE, in_progress: COL_PAGE, done: COL_PAGE })
+  }, [])
+
+  useEffect(() => {
+    runAlertStats({}).then(setBackendStats).catch(() => {})
   }, [])
 
   const dismissAll = useMutation(dismissAllFn)
@@ -370,6 +380,18 @@ export function AlertsPage({ onViewSite }: Props) {
 
   // Count by HTTP code for header filters
   const { codeCounts, deadCount, criticalCount, warningCount } = useMemo(() => {
+    if (backendStats) {
+      const codeCounts: Record<string, number> = {
+        'http 0':   backendStats.http0,
+        'http 403': backendStats.http403,
+        'http 404': backendStats.http404,
+        'http 429': backendStats.http429,
+        'http 5':   backendStats.http5xx,
+        'redirect': backendStats.redirect,
+        'park':     backendStats.parked,
+      }
+      return { codeCounts, deadCount: backendStats.dead, criticalCount: backendStats.critical, warningCount: backendStats.warning }
+    }
     const codeCounts: Record<string, number> = {}
     let dead = 0, critical = 0, warning = 0
     for (const a of alerts) {
@@ -382,7 +404,7 @@ export function AlertsPage({ onViewSite }: Props) {
       else if (lbl === 'WARNING') warning++
     }
     return { codeCounts, deadCount: dead, criticalCount: critical, warningCount: warning }
-  }, [alerts])
+  }, [alerts, backendStats])
 
   // Apply filters
   const filtered = useMemo(() => alerts.filter(a => {

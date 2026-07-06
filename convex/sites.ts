@@ -915,3 +915,48 @@ export const rebuildStatusCounters = internalMutation({
   },
 })
 
+
+export const alertStatsPage = internalQuery({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .paginate({ cursor: cursor ?? null, numItems: 2048 })
+    const c = { total: 0, dead: 0, critical: 0, warning: 0, http0: 0, http404: 0, http403: 0, http429: 0, http5xx: 0, redirect: 0, parked: 0 }
+    for (const a of page.page) {
+      const m = (a.message ?? '').toLowerCase()
+      const sev = a.severity ?? 'warning'
+      const isDead = m.includes('http 0') || m.includes('consecutive')
+      c.total++
+      if (isDead) c.dead++
+      else if (sev === 'critical') c.critical++
+      else c.warning++
+      if (m.includes('http 0')) c.http0++
+      else if (m.includes('http 404')) c.http404++
+      else if (m.includes('http 403')) c.http403++
+      else if (m.includes('http 429')) c.http429++
+      else if (m.includes('redirect')) c.redirect++
+      else if (m.includes('park')) c.parked++
+      else if (m.match(/http 5\d\d/)) c.http5xx++
+    }
+    return { c, isDone: page.isDone, cursor: page.continueCursor }
+  },
+})
+
+export const alertStats = action({
+  args: {},
+  handler: async (ctx) => {
+    const totals = { total: 0, dead: 0, critical: 0, warning: 0, http0: 0, http404: 0, http403: 0, http429: 0, http5xx: 0, redirect: 0, parked: 0 }
+    let cursor: string | undefined = undefined
+    let done = false
+    while (!done) {
+      const page: any = await ctx.runQuery(internal.sites.alertStatsPage, { cursor })
+      for (const k of Object.keys(totals) as (keyof typeof totals)[]) {
+        totals[k] += page.c[k] ?? 0
+      }
+      done = page.isDone
+      cursor = page.cursor
+    }
+    return totals
+  },
+})
