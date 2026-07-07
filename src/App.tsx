@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 import { Sidebar } from './components/layout/Sidebar'
@@ -13,7 +13,20 @@ import { SettingsPage } from './pages/SettingsPage'
 import { useMedialister } from './hooks/useMedialister'
 import type { Site } from './types'
 
-const countAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, number>('sites:countAlerts')
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const listByColumnFn = makeFunctionReference<'query', { workflowStatus: string; limit?: number }, any[]>('sites:listAlertsByColumn')
+
+function countGrouped(alerts: { domain?: string }[]): number {
+  const roots = new Set<string>()
+  let singles = 0
+  for (const a of alerts) {
+    const d = a.domain ?? ''
+    const idx = d.indexOf('/')
+    if (idx === -1) singles++
+    else roots.add(d.slice(0, idx))
+  }
+  return singles + roots.size
+}
 
 export type Page = 'dashboard' | 'sites' | 'checker' | 'alerts' | 'campaigns' | 'settings'
 type AppView = 'landing' | 'app'
@@ -25,7 +38,13 @@ export default function App() {
 
   const { syncing, syncProgress, syncTotal, totalItems } = useMedialister()
 
-  const alertCount = useQuery(countAlertsFn, { dismissed: false }) ?? 0
+  const newAlerts    = useQuery(listByColumnFn, { workflowStatus: 'new',    limit: 16384 }) ?? []
+  const urgentAlerts = useQuery(listByColumnFn, { workflowStatus: 'urgent', limit: 16384 }) ?? []
+  const deadAlerts   = useQuery(listByColumnFn, { workflowStatus: 'dead',   limit: 16384 }) ?? []
+  const alertCount   = useMemo(
+    () => countGrouped(newAlerts) + countGrouped(urgentAlerts) + countGrouped(deadAlerts),
+    [newAlerts, urgentAlerts, deadAlerts],
+  )
 
   if (view === 'landing') {
     return (
