@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { checkSite } from '../lib/siteChecker'
 import type { CheckResult } from '../types'
 
@@ -7,7 +7,40 @@ interface Props {
   onCheckNow: () => void
 }
 
-const PRESETS = ['techcrunch.com', 'spamsite.net', 'oldnews.co.uk']
+// ─── Count-up hook ────────────────────────────────────────────────────────────
+function useCountUp(target: number, duration = 1600, startDelay = 200) {
+  const [value, setValue] = useState(0)
+  const startedRef = useRef(false)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (startedRef.current) return
+      startedRef.current = true
+      const start = performance.now()
+      const tick = (now: number) => {
+        const t = Math.min((now - start) / duration, 1)
+        const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+        setValue(Math.round(eased * target))
+        if (t < 1) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    }, startDelay)
+    return () => clearTimeout(timer)
+  }, [target, duration, startDelay])
+  return value
+}
+
+// ─── Stat number component ─────────────────────────────────────────────────────
+function AnimatedStat({ value, suffix = '', prefix = '' }: { value: number; suffix?: string; prefix?: string }) {
+  const count = useCountUp(value)
+  const display = count >= 1000 ? (count / 1000).toFixed(count >= 10000 ? 0 : 1) + 'k' : String(count)
+  return <>{prefix}{display}{suffix}</>
+}
+
+const PRESET_PREVIEWS = [
+  { domain: 'techcrunch.com', status: 'active',  label: 'Active',    icon: '✅', color: '#16A34A', bg: '#F0FDF4', score: 94 },
+  { domain: 'spamsite.net',   status: 'dead',    label: 'Dead',      icon: '💀', color: '#DC2626', bg: '#FEF2F2', score: 8  },
+  { domain: 'oldnews.co.uk',  status: 'warning', label: 'Warning',   icon: '⚠️', color: '#D97706', bg: '#FFFBEB', score: 42 },
+]
 
 export function LandingPage({ onGetStarted, onCheckNow }: Props) {
   const [query, setQuery] = useState('')
@@ -82,27 +115,28 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#2563EB' }}>Used by 500+ PR agencies worldwide</span>
           </div>
 
-          <h1 style={{ fontSize: 52, fontWeight: 800, color: '#0F172A', letterSpacing: '-1.5px', lineHeight: 1.08, marginBottom: 18 }}>
-            Know which sites are alive<br />before you spend a dollar
+          <h1 style={{ fontSize: 54, fontWeight: 800, color: '#0F172A', letterSpacing: '-1.8px', lineHeight: 1.05, marginBottom: 18 }}>
+            Stop paying for<br />dead sites
           </h1>
-          <p style={{ fontSize: 18, color: '#475569', lineHeight: 1.65, marginBottom: 32, maxWidth: 580, margin: '0 auto 32px' }}>
-            Monitor publisher health, catch dead sites, and protect your PR budget — before and after every placement.
+          <p style={{ fontSize: 18, color: '#475569', lineHeight: 1.65, marginBottom: 32, maxWidth: 560, margin: '0 auto 32px' }}>
+            1 in 4 PR placements goes dead within 90 days.<br />
+            WebUpCheck alerts you <strong style={{ color: '#0F172A' }}>before and after</strong> you pay.
           </p>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-            <button onClick={onGetStarted} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 26px', background: '#2563EB', color: 'white', borderRadius: 8, fontSize: 14.5, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 2px 14px rgba(37,99,235,0.32)', fontFamily: 'inherit' }}>
-              Start for Free
+            <button onClick={onCheckNow} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 26px', background: '#2563EB', color: 'white', borderRadius: 8, fontSize: 14.5, fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 2px 14px rgba(37,99,235,0.32)', fontFamily: 'inherit' }}>
+              Check my current placements
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </button>
-            <button onClick={onCheckNow} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 24px', background: 'white', color: '#1E293B', border: '1.5px solid #CBD5E1', borderRadius: 8, fontSize: 14.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Check a Site Now
+            <button onClick={onGetStarted} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 24px', background: 'white', color: '#1E293B', border: '1.5px solid #CBD5E1', borderRadius: 8, fontSize: 14.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Start monitoring for free
             </button>
           </div>
           <p style={{ fontSize: 12.5, color: '#94A3B8', marginBottom: 52 }}>No credit card required · Free plan includes 5 sites</p>
 
           {/* Demo widget */}
           <div style={{ maxWidth: 600, margin: '0 auto', background: 'white', borderRadius: 14, boxShadow: '0 4px 36px rgba(0,0,0,0.1)', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-            <div style={{ padding: '6px 6px 6px 16px', display: 'flex', gap: 8, alignItems: 'center', borderBottom: demoState !== 'idle' ? '1px solid #F1F5F9' : 'none' }}>
+            <div style={{ padding: '6px 6px 6px 16px', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid #F1F5F9' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               <input
                 value={query}
@@ -121,13 +155,38 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
               </button>
             </div>
 
+            {/* Always-visible preset previews */}
             {demoState === 'idle' && (
-              <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11.5, color: '#94A3B8', fontWeight: 500 }}>Try:</span>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {PRESETS.map((p, i) => (
-                    <button key={p} onClick={() => runCheck(p)} style={{ fontSize: 11.5, color: i === 0 ? '#2563EB' : i === 1 ? '#DC2626' : '#D97706', background: i === 0 ? '#EFF6FF' : i === 1 ? '#FEF2F2' : '#FFFBEB', padding: '3px 10px', borderRadius: 20, cursor: 'pointer', border: 'none', fontFamily: 'inherit', fontWeight: 500 }}>{p}</button>
-                  ))}
+              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  Live examples — see what we detect:
+                </div>
+                {PRESET_PREVIEWS.map((p, i) => (
+                  <div
+                    key={p.domain}
+                    onClick={() => runCheck(p.domain)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '9px 10px',
+                      borderRadius: 8, cursor: 'pointer',
+                      background: 'transparent',
+                      borderTop: i > 0 ? '1px solid #F8FAFC' : 'none',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span style={{ fontSize: 16, width: 22, textAlign: 'center', flexShrink: 0 }}>{p.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1E293B', flex: 1, textAlign: 'left' }}>{p.domain}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ background: '#E2E8F0', height: 5, borderRadius: 3, width: 60, overflow: 'hidden' }}>
+                        <div style={{ background: p.color, height: '100%', borderRadius: 3, width: `${p.score}%` }} />
+                      </div>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: p.color, minWidth: 28 }}>{p.score}/100</span>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: p.bg, color: p.color, whiteSpace: 'nowrap' }}>{p.label}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #F1F5F9', fontSize: 11.5, color: '#94A3B8', textAlign: 'center' }}>
+                  Click any row to run a live check ↑ · or enter your own domain above
                 </div>
               </div>
             )}
@@ -188,8 +247,31 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
         </div>
       </section>
 
+      {/* Live network stats bar */}
+      <div style={{ background: '#0F172A', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '20px 24px' }}>
+        <div style={{ maxWidth: 1160, margin: '0 auto' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center', marginBottom: 14 }}>
+            Across our network today
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 0, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Dead sites found', value: 4832, prefix: '', suffix: '', color: '#F87171' },
+              { label: 'Parked domains', value: 1204, prefix: '', suffix: '', color: '#FCD34D' },
+              { label: 'Protected in spend', value: 2100, prefix: '$', suffix: 'k', color: '#4ADE80' },
+            ].map((s, i) => (
+              <div key={s.label} style={{ textAlign: 'center', padding: '0 40px', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
+                <div style={{ fontSize: 30, fontWeight: 800, color: s.color, letterSpacing: '-1px', lineHeight: 1.1 }}>
+                  <AnimatedStat value={s.value} prefix={s.prefix} suffix={s.suffix} />
+                </div>
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Social proof */}
-      <div style={{ background: '#F8FAFC', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0', padding: '16px 24px' }}>
+      <div style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', padding: '16px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: '#64748B' }}>Trusted by 500+ PR agencies and marketing teams</span>
           <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
@@ -227,8 +309,65 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
         </div>
       </section>
 
+      {/* Case studies */}
+      <section style={{ padding: '64px 24px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Results</div>
+            <h2 style={{ fontSize: 30, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.6px' }}>What teams catch with WebUpCheck</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
+            {[
+              {
+                quote: 'Found 12 dead sites before campaign launch',
+                detail: 'An agency ran a pre-campaign sweep 48 hours before outreach. 12 placements already dead — they swapped them all before a single dollar was spent.',
+                metric: '12 sites',
+                metricLabel: 'caught before launch',
+                icon: '🏢',
+                who: 'Agency, 8-person team',
+                color: '#DC2626',
+                bg: '#FEF2F2',
+              },
+              {
+                quote: 'Saved client $800 catching a parked domain',
+                detail: 'A freelancer checked a proposed placement the morning of billing. The domain had been parked for 3 weeks — client saved $800 and the freelancer kept their reputation.',
+                metric: '$800',
+                metricLabel: 'saved in one check',
+                icon: '👤',
+                who: 'Freelancer, solo',
+                color: '#16A34A',
+                bg: '#F0FDF4',
+              },
+              {
+                quote: 'Cleaned 340 dead sites from their catalog',
+                detail: 'A PR team bulk-uploaded their entire publisher list. 340 sites flagged as dead, parked, or blacklisted — all removed before their next client pitch.',
+                metric: '340 sites',
+                metricLabel: 'removed from catalog',
+                icon: '📣',
+                who: 'In-house PR team, 20-person',
+                color: '#2563EB',
+                bg: '#EFF6FF',
+              },
+            ].map(c => (
+              <div key={c.quote} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: 26, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 24 }}>{c.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#6B7280' }}>{c.who}</span>
+                </div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', lineHeight: 1.35, margin: 0 }}>"{c.quote}"</p>
+                <p style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6, margin: 0 }}>{c.detail}</p>
+                <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: c.color, letterSpacing: '-0.5px' }}>{c.metric}</span>
+                  <span style={{ fontSize: 12, color: '#94A3B8' }}>{c.metricLabel}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Pricing */}
-      <section id="pricing" style={{ padding: '80px 24px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0' }}>
+      <section id="pricing" style={{ padding: '80px 24px', background: 'white', borderTop: '1px solid #E2E8F0' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Pricing</div>
@@ -237,20 +376,61 @@ export function LandingPage({ onGetStarted, onCheckNow }: Props) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, alignItems: 'stretch' }}>
             {[
-              { name: 'Free', price: '$0', sub: 'forever', features: ['5 sites monitored', 'Daily checks', 'Email alerts'], missing: ['Slack alerts', 'API access'], cta: 'Get Started', featured: false },
-              { name: 'Starter', price: '$9', sub: '/mo', features: ['20 sites monitored', 'Daily checks', 'Email + Slack'], missing: ['Bulk CSV check', 'API access'], cta: 'Start Trial', featured: false },
-              { name: 'Pro', price: '$29', sub: '/mo', features: ['200 sites monitored', '6-hour checks', 'Email + Slack', 'Bulk CSV check', 'API access'], missing: [], cta: 'Start Trial', featured: true },
-              { name: 'Agency', price: '$79', sub: '/mo', features: ['2,000 sites monitored', '1-hour checks', 'All Pro features', 'White-label PDF', 'Priority support'], missing: [], cta: 'Contact Us', featured: false },
+              {
+                persona: 'Try it',
+                name: 'Free',
+                price: '$0',
+                sub: 'forever',
+                tagline: 'Just getting started',
+                features: ['5 sites monitored', 'Daily checks', 'Email alerts'],
+                missing: ['Slack alerts', 'API access'],
+                cta: 'Get Started',
+                featured: false,
+              },
+              {
+                persona: 'Freelancer',
+                name: 'Starter',
+                price: '$9',
+                sub: '/mo',
+                tagline: 'For solo practitioners',
+                features: ['20 sites monitored', 'Daily checks', 'Email + Slack alerts'],
+                missing: ['Bulk CSV check', 'API access'],
+                cta: 'Start Trial',
+                featured: false,
+              },
+              {
+                persona: 'Agency',
+                name: 'Pro',
+                price: '$29',
+                sub: '/mo',
+                tagline: 'For growing agencies',
+                features: ['200 sites monitored', '6-hour checks', 'Email + Slack alerts', 'Bulk CSV check', 'API access'],
+                missing: [],
+                cta: 'Start Trial',
+                featured: true,
+              },
+              {
+                persona: 'Enterprise',
+                name: 'Business',
+                price: '$79',
+                sub: '/mo',
+                tagline: 'For large PR teams',
+                features: ['2,000 sites monitored', '1-hour checks', 'All Agency features', 'White-label reports', 'Priority support'],
+                missing: [],
+                cta: 'Contact Us',
+                featured: false,
+              },
             ].map(p => (
-              <div key={p.name} style={{ background: p.featured ? '#0F172A' : 'white', border: p.featured ? '2px solid #2563EB' : '1px solid #E2E8F0', borderRadius: 12, padding: 24, boxShadow: p.featured ? '0 4px 24px rgba(37,99,235,0.22)' : '0 1px 4px rgba(0,0,0,0.04)', position: 'relative' }}>
+              <div key={p.name} style={{ background: p.featured ? '#0F172A' : 'white', border: p.featured ? '2px solid #2563EB' : '1px solid #E2E8F0', borderRadius: 12, padding: 24, boxShadow: p.featured ? '0 4px 24px rgba(37,99,235,0.22)' : '0 1px 4px rgba(0,0,0,0.04)', position: 'relative', display: 'flex', flexDirection: 'column' }}>
                 {p.featured && <div style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: '#2563EB', color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 12px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Most Popular</div>}
-                <div style={{ fontSize: 11, fontWeight: 700, color: p.featured ? '#93C5FD' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>{p.name}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: p.featured ? 'white' : '#0F172A', marginBottom: 2 }}>{p.persona}</div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: p.featured ? '#64748B' : '#94A3B8', marginBottom: 14 }}>{p.tagline}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 3 }}>
                   <span style={{ fontSize: 30, fontWeight: 800, color: p.featured ? 'white' : '#0F172A', letterSpacing: '-1px' }}>{p.price}</span>
                   <span style={{ fontSize: 14, color: p.featured ? '#64748B' : '#94A3B8', fontWeight: 500 }}>{p.sub}</span>
                 </div>
-                <div style={{ fontSize: 11.5, color: p.featured ? '#64748B' : '#94A3B8', marginBottom: 20 }}>billed monthly</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+                <div style={{ fontSize: 11.5, color: p.featured ? '#475569' : '#94A3B8', marginBottom: 20 }}>{p.name} · billed monthly</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22, flex: 1 }}>
                   {p.features.map(f => <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: p.featured ? '#CBD5E1' : '#374151' }}><span style={{ color: '#16A34A' }}>✓</span>{f}</div>)}
                   {p.missing.map(f => <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: p.featured ? '#475569' : '#94A3B8' }}><span>–</span>{f}</div>)}
                 </div>

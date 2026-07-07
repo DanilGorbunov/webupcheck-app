@@ -111,12 +111,14 @@ export function useMedialister() {
           })) })
         } catch { /* skip failed batch, continue sync */ }
 
-        if (logId) {
-          await updateSyncLog({ logId, processed: page, totalPages })
+        // Update progress every 10 pages to reduce Convex mutations and React re-renders
+        if (page % 10 === 0 || page === totalPages) {
+          if (logId) {
+            await updateSyncLog({ logId, processed: page, totalPages })
+          }
+          setSyncProgress(page)
         }
-
-        setSyncProgress(page)
-        await new Promise(r => setTimeout(r, 50))
+        await new Promise(r => setTimeout(r, 150))
       }
 
       if (logId!) {

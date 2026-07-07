@@ -1,4 +1,11 @@
 import { useState } from 'react'
+import { useAction } from 'convex/react'
+import { makeFunctionReference } from 'convex/server'
+
+type DiagStep = { step: string; ok: boolean; detail: string }
+type DiagResult = { steps: DiagStep[]; httpStatus: number; finalStatus: string; responseTimeMs?: number }
+
+const diagnoseDomainFn = makeFunctionReference<'action', { domain: string }, DiagResult>('checker:diagnoseDomain')
 
 type Tab = 'account' | 'notifications' | 'api' | 'billing'
 
@@ -45,6 +52,70 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   )
 }
 
+function DiagnosticPanel() {
+  const diagnoseDomain = useAction(diagnoseDomainFn)
+  const [domain, setDomain] = useState('smartboostb2b.fr')
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<DiagResult | null>(null)
+
+  async function run() {
+    setRunning(true)
+    setResult(null)
+    try {
+      const r = await diagnoseDomain({ domain: domain.trim().replace(/^https?:\/\//, '') })
+      setResult(r)
+    } catch (e) {
+      setResult({ steps: [{ step: 'Error', ok: false, detail: String(e) }], httpStatus: 0, finalStatus: 'error' })
+    }
+    setRunning(false)
+  }
+
+  return (
+    <Section title="Pipeline Diagnostic">
+      <div style={{ fontSize: 13, color: '#475569', marginBottom: 14 }}>
+        Перевіряє домен крок за кроком: DNS → Direct HTTP → Bright Data proxy
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <input
+          value={domain}
+          onChange={e => setDomain(e.target.value)}
+          placeholder="domain.com"
+          style={{ flex: 1, padding: '8px 12px', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}
+          onKeyDown={e => e.key === 'Enter' && run()}
+        />
+        <button
+          onClick={run}
+          disabled={running}
+          style={{ padding: '8px 18px', background: '#2563EB', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer', opacity: running ? 0.7 : 1, fontFamily: 'inherit' }}
+        >
+          {running ? 'Checking…' : 'Run Check'}
+        </button>
+      </div>
+      {result && (
+        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '14px 16px' }}>
+          {result.steps.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: i < result.steps.length - 1 ? 10 : 0 }}>
+              <span style={{ fontSize: 15, marginTop: 1 }}>{s.ok ? '✅' : '❌'}</span>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{s.step}</span>
+                <span style={{ fontSize: 13, color: '#64748B', marginLeft: 8 }}>{s.detail}</span>
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #E2E8F0', display: 'flex', gap: 16 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: result.finalStatus === 'alive' ? '#16A34A' : '#DC2626' }}>
+              {result.finalStatus === 'alive' ? '✅ Site is ALIVE' : '💀 Site is DEAD'}
+            </span>
+            {result.responseTimeMs && (
+              <span style={{ fontSize: 13, color: '#94A3B8' }}>{result.responseTimeMs}ms</span>
+            )}
+          </div>
+        </div>
+      )}
+    </Section>
+  )
+}
+
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('account')
   const [notifs, setNotifs] = useState({ email: true, slack: false, siteDown: true, sslExpiry: true, parkingDetected: true, drDrop: false })
@@ -88,6 +159,8 @@ export function SettingsPage() {
               <button style={{ padding: '7px 16px', background: '#2563EB', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Save Changes</button>
             </div>
           </Section>
+
+          <DiagnosticPanel />
 
           <Section title="Danger Zone">
             <Field label="Delete account" sub="Permanently delete your account and all data">

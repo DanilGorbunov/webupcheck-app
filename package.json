@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "convex": "^1.42.1",
+    "https-proxy-agent": "^9.1.0",
+    "node-fetch": "^3.3.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

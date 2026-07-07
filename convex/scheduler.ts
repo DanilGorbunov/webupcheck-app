@@ -1,9 +1,14 @@
 import { internalAction, internalMutation, internalQuery } from './_generated/server'
 import { v } from 'convex/values'
-import { internal } from './_generated/api'
+import { api, internal } from './_generated/api'
 
 const DAILY_LIMIT = 10000
 const BATCH_SIZE = 50
+// Per-cron-tick: 1500 sites, 1 batch group at a time (50 concurrent HTTP checks)
+// 1500 × 48 ticks/day + 10k daily = ~82k sites/day (full coverage every ~1.3 days)
+// DB I/O: ~360MB/day — well within 50GB free tier
+const SCHEDULED_LIMIT = 1500
+const CONCURRENT_GROUPS = 1
 
 export const getSitesToCheck = internalQuery({
   args: { limit: v.number() },
@@ -93,6 +98,40 @@ export const runDailyCheck = internalAction({
         message: String(err),
       })
     }
+  },
+})
+
+// Runs every 30 minutes via cron — server-side, no browser involvement
+export const runScheduledCheck = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    // Skip if Medialister sync is running — avoid flooding browser with concurrent mutations
+    const syncLog = await ctx.runQuery(api.sites.getActiveSyncLog, {})
+    if (syncLog?.status === 'running') return
+
+    const sites = await ctx.runQuery(internal.scheduler.getSitesToCheck, { limit: SCHEDULED_LIMIT })
+    if (!sites.length) return
+
+    const batchId = `cron_${Date.now()}`
+    const batches: { domain: string; siteId: string }[][] = []
+    for (let i = 0; i < sites.length; i += BATCH_SIZE) {
+      batches.push(sites.slice(i, i + BATCH_SIZE).map(s => ({ domain: s.domain, siteId: s._id })))
+    }
+
+    // One batch at a time — 50 concurrent HTTP checks, avoids Convex mutation overload
+    for (let i = 0; i < batches.length; i += CONCURRENT_GROUPS) {
+      const group = batches.slice(i, i + CONCURRENT_GROUPS)
+      await Promise.allSettled(
+        group.map(batch => ctx.runAction(internal.checker.checkBatch, { batch: batch as never, batchId }))
+      )
+      // Brief pause to let Convex process pending mutations between batches
+      if (i + CONCURRENT_GROUPS < batches.length) {
+        await new Promise(r => setTimeout(r, 300))
+      }
+    }
+
+    // Rebuild status counters after all checks finish (avoids per-mutation OCC)
+    await ctx.runMutation(internal.sites.rebuildStatusCounters, {})
   },
 })
 

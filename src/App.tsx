@@ -11,10 +11,9 @@ import { AlertsPage } from './pages/AlertsPage'
 import { CampaignsPage } from './pages/CampaignsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { useMedialister } from './hooks/useMedialister'
-import { useHealthChecker } from './hooks/useHealthChecker'
 import type { Site } from './types'
 
-const listAlertsFn = makeFunctionReference<'query', { dismissed?: boolean; limit?: number }, Array<unknown>>('sites:listAlerts')
+const countAlertsFn = makeFunctionReference<'query', { dismissed?: boolean }, number>('sites:countAlerts')
 
 export type Page = 'dashboard' | 'sites' | 'checker' | 'alerts' | 'campaigns' | 'settings'
 type AppView = 'landing' | 'app'
@@ -25,9 +24,8 @@ export default function App() {
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
 
   const { syncing, syncProgress, syncTotal, totalItems } = useMedialister()
-  const { healthChecked, healthTotal, healthRunning } = useHealthChecker()
 
-  const alertCount = (useQuery(listAlertsFn, { dismissed: false }) ?? []).length
+  const alertCount = useQuery(countAlertsFn, { dismissed: false }) ?? 0
 
   if (view === 'landing') {
     return (
@@ -71,9 +69,6 @@ export default function App() {
         syncing={syncing}
         syncProgress={syncProgress}
         syncTotal={syncTotal}
-        healthRunning={healthRunning}
-        healthChecked={healthChecked}
-        healthTotal={healthTotal}
         alertCount={alertCount}
       />
 

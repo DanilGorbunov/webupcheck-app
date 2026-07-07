@@ -1,4 +1,4 @@
-import { query, mutation, action, internalMutation, internalQuery, MutationCtx } from './_generated/server'
+import { query, mutation, action, internalMutation, internalQuery, internalAction, MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { paginationOptsValidator } from 'convex/server'
 import { internal } from './_generated/api'
@@ -35,19 +35,46 @@ export const getByDomain = query({
 })
 
 
-export const stats = query({
+// Lightweight counter-only query — reads 7 counter docs, no full table scan
+export const siteCounters = query({
   args: {},
   handler: async (ctx) => {
-    const statuses = ['Active', 'Warning', 'Unreachable', 'Parked', 'Blacklisted', 'NeedsReview']
+    const statuses = ['Active', 'Warning', 'Unreachable', 'Parked', 'Blacklisted', 'NeedsReview', 'Unknown']
     const rows = await Promise.all(
       statuses.map(s => ctx.db.query('counters').withIndex('by_name', q => q.eq('name', `status_${s}`)).first())
     )
+    const [active, warning, unreachable, parked, blacklisted, needsReview, unknown] = rows.map(r => r?.value ?? 0)
+    const total   = active + warning + unreachable + parked + blacklisted + needsReview + unknown
+    const checked = active + warning + unreachable + parked + blacklisted + needsReview
+    const issues  = unreachable + parked + blacklisted
+    return { active, warning, unreachable, parked, blacklisted, needsReview, checked, issues, unknown, total }
+  },
+})
+
+export const stats = query({
+  args: {},
+  handler: async (ctx) => {
+    const statuses = ['Active', 'Warning', 'Unreachable', 'Parked', 'Blacklisted', 'NeedsReview', 'Unknown']
+    const rows = await Promise.all(
+      statuses.map(s => ctx.db.query('counters').withIndex('by_name', q => q.eq('name', `status_${s}`)).first())
+    )
+
+    // Compute site-level stats (DR, price, languages) from a sample scan
+    const sample = await ctx.db.query('sites').take(8000)
+    const withDr50 = sample.filter(s => (s.dr ?? 0) >= 50).length
+    const priced = sample.filter(s => s.price > 0)
+    const avgPrice = priced.length ? Math.round(priced.reduce((a, s) => a + s.price, 0) / priced.length) : 0
+    const langSet = new Set<string>()
+    sample.forEach(s => (s.languages ?? []).forEach((l: string) => langSet.add(l)))
+    const languages = langSet.size
+
     const initialized = rows.some(r => r !== null)
     if (initialized) {
-      const [active, warning, unreachable, parked, blacklisted, needsReview] = rows.map(r => r?.value ?? 0)
+      const [active, warning, unreachable, parked, blacklisted, needsReview, unknown] = rows.map(r => r?.value ?? 0)
+      const total   = active + warning + unreachable + parked + blacklisted + needsReview + unknown
       const checked = active + warning + unreachable + parked + blacklisted + needsReview
       const issues  = unreachable + parked + blacklisted
-      return { active, warning, unreachable, parked, blacklisted, needsReview, checked, issues, unknown: 0, total: 0, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
+      return { active, warning, unreachable, parked, blacklisted, needsReview, checked, issues, unknown, total, withDr50, avgPrice, languages, lastChecked: 0 }
     }
     // Counters not yet initialized — fallback to scanning (capped)
     const take = (s: string, n: number) =>
@@ -56,9 +83,10 @@ export const stats = query({
       await Promise.all([take('Warning', 2000), take('Unreachable', 2000), take('Parked', 2000), take('Blacklisted', 500), take('NeedsReview', 500), take('Active', 8000)])
     const active = activeRows.length, warning = warningRows.length, unreachable = unreachableRows.length
     const parked = parkedRows.length, blacklisted = blacklistedRows.length, needsReview = needsReviewRows.length
-    const checked = active + warning + unreachable + parked + blacklisted + needsReview
+    const total   = active + warning + unreachable + parked + blacklisted + needsReview
+    const checked = total
     const issues  = unreachable + parked + blacklisted
-    return { active, warning, unreachable, parked, blacklisted, needsReview, checked, issues, total: 0, unknown: 0, withDr50: 0, avgPrice: 0, languages: 0, lastChecked: 0 }
+    return { active, warning, unreachable, parked, blacklisted, needsReview, checked, issues, total, unknown: 0, withDr50, avgPrice, languages, lastChecked: 0 }
   },
 })
 
@@ -111,6 +139,9 @@ export const saveCheckResult = mutation({
     isParked: v.optional(v.boolean()),
     responseTimeMs: v.optional(v.number()),
     viaProxy: v.optional(v.boolean()),
+    wordCount: v.optional(v.number()),
+    ogImage: v.optional(v.string()),
+    canonical: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const site = await ctx.db.get(args.siteId)
@@ -136,6 +167,10 @@ export const saveCheckResult = mutation({
       metaDescription: args.metaDescription,
       isParked: args.isParked,
       responseTimeMs: args.responseTimeMs,
+      viaProxy: args.viaProxy,
+      ...(args.wordCount != null ? { wordCount: args.wordCount } : {}),
+      ...(args.ogImage ? { ogImage: args.ogImage } : {}),
+      ...(args.canonical ? { canonical: args.canonical } : {}),
       status: newStatus,
       lastCheckedAt: Date.now(),
       consecutiveFailures: newFailures,
@@ -158,6 +193,45 @@ export const saveCheckResult = mutation({
       statusBefore,
       statusAfter: newStatus,
     })
+
+    // When site is confirmed alive (2xx, not parked), auto-dismiss any open alerts.
+    // This fires on every successful check — direct 200 OR proxy 200 after 403 retry.
+    if (is2xx && !args.isParked) {
+      // Primary: alerts directly attached to this siteId
+      const openAlerts = await ctx.db.query('alerts')
+        .withIndex('by_site', q => q.eq('siteId', args.siteId))
+        .filter(q => q.eq(q.field('dismissed'), false))
+        .collect()
+
+      // www. mismatch fix: for path-based/subdomain sites, also dismiss group alerts
+      // whose domain = rootDomain and which list this site.domain in their subdomains.
+      // This catches the case where www.example.com/path and example.com/path are two
+      // separate site records — the group alert may be attached to the other record's siteId.
+      const rootDomain = getRootDomain(site.domain)
+      if (rootDomain !== site.domain) {
+        const groupAlerts = await ctx.db.query('alerts')
+          .withIndex('by_dismissed', q => q.eq('dismissed', false))
+          .filter(q => q.eq(q.field('domain'), rootDomain))
+          .collect()
+        const seen = new Set(openAlerts.map(a => a._id.toString()))
+        for (const ga of groupAlerts) {
+          if (!seen.has(ga._id.toString()) &&
+              (ga.subdomains ?? []).some(s => s === site.domain || s.replace(/^www\./, '') === site.domain.replace(/^www\./, ''))) {
+            openAlerts.push(ga)
+            seen.add(ga._id.toString())
+          }
+        }
+      }
+
+      if (openAlerts.length > 0) {
+        const now = Date.now()
+        for (const alert of openAlerts) {
+          await ctx.db.patch(alert._id, { dismissed: true, dismissedAt: now })
+          await adjustCounter(ctx, 'alerts_active', -1)
+        }
+      }
+      return
+    }
 
     // Only alert when status changes to something problematic.
     // 403/429/406 = bot-blocked: site may be alive for humans, needs manual check.
@@ -182,8 +256,8 @@ export const saveCheckResult = mutation({
     })()
     if (!isAlertWorthy) return
 
-    const severity = (newStatus === 'Unreachable' || newStatus === 'Parked') ? 'critical' : 'warning'
-    const message = isBotBlocked
+    let severity = (newStatus === 'Unreachable' || newStatus === 'Parked') ? 'critical' : 'warning'
+    let message = isBotBlocked
       ? `Checker blocked (HTTP ${http}) — manual verification needed`
       : newStatus === 'Unreachable' && is5xx
       ? `Server down — ${newFailures} consecutive checks failed (HTTP ${http})`
@@ -194,6 +268,29 @@ export const saveCheckResult = mutation({
       : newStatus === 'Warning' && args.redirectUrl
       ? `Redirects to ${args.redirectUrl}`
       : `Status changed: ${statusBefore} → ${newStatus}`
+
+    // Cloudflare detection: HTTP 0 that follows HTTP 403 = bot-protected, not truly dead
+    let isCloudflareBlock = false
+    if (http === 0 && !isBotBlocked) {
+      const recentHistory = await ctx.db.query('checkHistory')
+        .withIndex('by_site', q => q.eq('siteId', args.siteId))
+        .order('desc')
+        .take(5)
+      isCloudflareBlock = recentHistory.some(h =>
+        h.httpStatus === 403 || h.httpStatus === 429 || h.httpStatus === 406
+      )
+      if (isCloudflareBlock) {
+        severity = 'warning'
+        message = `Cloudflare protection (HTTP 403 → 0) — site may be accessible in browser`
+      }
+    }
+    const effectiveBotBlocked = isBotBlocked || isCloudflareBlock
+
+    // Snapshot SEO metrics from site at alert creation time
+    const seoFields = {
+      ...(site.dr != null ? { dr: site.dr } : {}),
+      ...(site.organicTraffic != null ? { organicTraffic: site.organicTraffic } : {}),
+    }
 
     // Subdomain grouping: group N subdomains of same root into one alert
     const rootDomain = getRootDomain(site.domain)
@@ -229,9 +326,32 @@ export const saveCheckResult = mutation({
         createdAt: Date.now(),
         dismissed: false,
         workflowStatus: severity === 'critical' ? 'urgent' : 'new',
+        ...seoFields,
       })
       await adjustCounter(ctx, 'alerts_active', 1)
       await ctx.scheduler.runAfter(0, internal.ai.classifyAlert, { alertId: subAlertId })
+      return
+    }
+
+    // Deduplicate: if an open alert already exists for this site, update it in place
+    const existingAlert = await ctx.db.query('alerts')
+      .withIndex('by_site', q => q.eq('siteId', args.siteId))
+      .filter(q => q.eq(q.field('dismissed'), false))
+      .first()
+
+    if (existingAlert) {
+      await ctx.db.patch(existingAlert._id, {
+        severity,
+        message,
+        ...(effectiveBotBlocked ? { aiCategory: 'bot_blocked' } : {}),
+        // Escalate workflowStatus if severity went up (never downgrade user's triage)
+        ...(severity === 'critical' && existingAlert.workflowStatus === 'new'
+          ? { workflowStatus: 'urgent' }
+          : {}),
+      })
+      if (!effectiveBotBlocked) {
+        await ctx.scheduler.runAfter(0, internal.ai.classifyAlert, { alertId: existingAlert._id })
+      }
       return
     }
 
@@ -243,10 +363,11 @@ export const saveCheckResult = mutation({
       createdAt: Date.now(),
       dismissed: false,
       workflowStatus: severity === 'critical' ? 'urgent' : 'new',
-      ...(isBotBlocked ? { aiCategory: 'bot_blocked' } : {}),
+      ...(effectiveBotBlocked ? { aiCategory: 'bot_blocked' } : {}),
+      ...seoFields,
     })
     await adjustCounter(ctx, 'alerts_active', 1)
-    if (!isBotBlocked) {
+    if (!effectiveBotBlocked) {
       await ctx.scheduler.runAfter(0, internal.ai.classifyAlert, { alertId })
     }
   },
@@ -265,14 +386,14 @@ export const countAlertsByType = query({
   handler: async (ctx) => {
     const alerts = await ctx.db.query('alerts')
       .withIndex('by_dismissed', q => q.eq('dismissed', false))
-      .take(5000)
-    let critical = 0
-    let needsReview = 0
+      .take(8192)
+    let critical = 0, needsReview = 0, warning = 0
     for (const a of alerts) {
       if (a.aiCategory === 'bot_blocked') needsReview++
       else if (a.severity === 'critical') critical++
+      else if (a.severity === 'warning') warning++
     }
-    return { critical, needsReview }
+    return { critical, needsReview, warning }
   },
 })
 
@@ -288,6 +409,37 @@ export const markBotBlockedAsDown = mutation({
       message: alert.message.replace('Checker blocked', 'Confirmed down'),
     })
     await ctx.db.patch(alert.siteId, { status: 'Unreachable' })
+  },
+})
+
+export const listAlertSiteIdPage = internalQuery({
+  args: { afterCreatedAt: v.number() },
+  handler: async (ctx, { afterCreatedAt }) => {
+    const alerts = await ctx.db.query('alerts')
+      .withIndex('by_created', q => q.gte('createdAt', afterCreatedAt))
+      .filter(q => q.eq(q.field('dismissed'), false))
+      .order('asc')
+      .take(4000)
+    return alerts.map(a => ({ siteId: a.siteId as string, createdAt: a.createdAt }))
+  },
+})
+
+export const listAlertPage = internalQuery({
+  args: { afterCreatedAt: v.number(), limit: v.optional(v.number()) },
+  handler: async (ctx, { afterCreatedAt, limit = 500 }) => {
+    const alerts = await ctx.db.query('alerts')
+      .withIndex('by_created', q => q.gte('createdAt', afterCreatedAt))
+      .filter(q => q.eq(q.field('dismissed'), false))
+      .order('asc')
+      .take(limit)
+    return alerts.map(a => ({
+      _id: a._id as string,
+      siteId: a.siteId as string,
+      domain: a.domain as string,
+      createdAt: a.createdAt,
+      severity: a.severity,
+      aiCategory: a.aiCategory,
+    }))
   },
 })
 
@@ -333,7 +485,7 @@ export const listAlerts = query({
     const rows = await ctx.db.query('alerts')
       .withIndex('by_dismissed', q => q.eq('dismissed', dismissed))
       .order('desc')
-      .take(Math.min(limit, 4000))
+      .take(Math.min(limit, 16384))
     // Strip heavy fields not needed for Kanban to reduce payload size
     return rows.map(r => ({
       _id: r._id,
@@ -355,10 +507,22 @@ export const listAlerts = query({
 export const countAlerts = query({
   args: { dismissed: v.optional(v.boolean()) },
   handler: async (ctx, { dismissed = false }) => {
-    const rows = await ctx.db.query('alerts')
-      .withIndex('by_dismissed', q => q.eq('dismissed', dismissed))
-      .take(16384)
-    return rows.length
+    if (dismissed) {
+      const rows = await ctx.db.query('alerts')
+        .withIndex('by_dismissed', q => q.eq('dismissed', true))
+        .take(8192)
+      return rows.length
+    }
+    // Count only actionable columns (new + urgent + in_progress + dead).
+    // Excludes done/ignored (resolved) and null-workflowStatus (legacy) so the
+    // sidebar badge matches what users actually see in the Kanban columns.
+    const [a, b, c, d] = await Promise.all([
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'new')).take(8192),
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'urgent')).take(8192),
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'in_progress')).take(8192),
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'dead')).take(8192),
+    ])
+    return a.length + b.length + c.length + d.length
   },
 })
 
@@ -595,6 +759,21 @@ export const completeSyncLog = mutation({
   }
 })
 
+export const logReverifyComplete = internalMutation({
+  args: { dismissed: v.number(), stillDead: v.number(), startedAt: v.number() },
+  handler: async (ctx, { dismissed, stillDead, startedAt }) => {
+    await ctx.db.insert('syncLog', {
+      type: 'alert_reverify',
+      startedAt,
+      completedAt: Date.now(),
+      totalItems: dismissed + stillDead,
+      processed: dismissed + stillDead,
+      status: 'completed',
+      message: `Reverify done — dismissed ${dismissed}, still dead ${stillDead}`,
+    })
+  },
+})
+
 export const getActiveSyncLog = query({
   args: {},
   handler: async (ctx) => {
@@ -608,6 +787,21 @@ export const getActiveSyncLog = query({
       return null
     }
   }
+})
+
+export const getLastReverifyLog = query({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      const logs = await ctx.db.query('syncLog')
+        .withIndex('by_type', q => q.eq('type', 'alert_reverify'))
+        .order('desc')
+        .take(1)
+      return logs[0] ?? null
+    } catch {
+      return null
+    }
+  },
 })
 
 export const listPaginated = query({
@@ -657,8 +851,9 @@ function deriveStatus(r: {
 }
 
 function getRootDomain(domain: string): string {
-  const parts = domain.split('.')
-  if (parts.length <= 2) return domain
+  const host = domain.split('/')[0] // strip path like tapinto.net/towns/south-brunswick → tapinto.net
+  const parts = host.split('.')
+  if (parts.length <= 2) return host
   return parts.slice(-2).join('.')
 }
 
@@ -736,14 +931,18 @@ export const siteStatusByPrice = query({
       '50-200': { Active: 0, Warning: 0, Unreachable: 0, Parked: 0 },
       '200+': { Active: 0, Warning: 0, Unreachable: 0, Parked: 0 },
     }
-    for (const status of statuses) {
-      const rows = await ctx.db.query('sites')
-        .withIndex('by_status', q => q.eq('status', status))
-        .take(3000)
+    const allRows = await Promise.all(
+      statuses.map(status =>
+        ctx.db.query('sites')
+          .withIndex('by_status', q => q.eq('status', status))
+          .take(3000)
+          .then(rows => rows.map(s => ({ price: s.price ?? 0, status })))
+      )
+    )
+    for (const rows of allRows) {
       for (const s of rows) {
-        const p = s.price ?? 0
-        const bk = p < 50 ? '0-50' : p < 200 ? '50-200' : '200+'
-        buckets[bk][status]++
+        const bk = s.price < 50 ? '0-50' : s.price < 200 ? '50-200' : '200+'
+        buckets[bk][s.status]++
       }
     }
     return buckets
@@ -753,12 +952,10 @@ export const siteStatusByPrice = query({
 export const languageBreakdown = query({
   args: {},
   handler: async (ctx) => {
-    const unreachable = await ctx.db.query('sites')
-      .withIndex('by_status', q => q.eq('status', 'Unreachable'))
-      .take(3000)
-    const warning = await ctx.db.query('sites')
-      .withIndex('by_status', q => q.eq('status', 'Warning'))
-      .take(3000)
+    const [unreachable, warning] = await Promise.all([
+      ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Unreachable')).take(3000),
+      ctx.db.query('sites').withIndex('by_status', q => q.eq('status', 'Warning')).take(3000),
+    ])
     const counts: Record<string, { unreachable: number; warning: number }> = {}
     for (const s of unreachable) {
       const lang = ((s.languages as string[]) ?? [])[0] ?? 'unknown'
@@ -823,7 +1020,7 @@ export const dashboardAlertStats = query({
     const alerts = await ctx.db.query('alerts')
       .withIndex('by_dismissed', q => q.eq('dismissed', false))
       .order('desc')
-      .take(3000)
+      .take(8192)
 
     const httpTypes: Record<string, number> = {
       'HTTP 0': 0, 'HTTP 404': 0, 'Server 5xx': 0,
@@ -831,6 +1028,8 @@ export const dashboardAlertStats = query({
     }
     const ageBuckets: Record<string, number> = { '<1d': 0, '1-7d': 0, '7-30d': 0, '>30d': 0 }
     const byDay: Record<string, { total: number; critical: number }> = {}
+    type DayTypeEntry = { date: string; dead: number; blocked: number; serverError: number; unreachable: number; parked: number; other: number }
+    const byDayType: Record<string, DayTypeEntry> = {}
     const cutoff14 = nowMs - 14 * 24 * 3600 * 1000
     let totalAge = 0
 
@@ -864,6 +1063,13 @@ export const dashboardAlertStats = query({
         if (!byDay[day]) byDay[day] = { total: 0, critical: 0 }
         byDay[day].total++
         if (a.severity === 'critical') byDay[day].critical++
+        if (!byDayType[day]) byDayType[day] = { date: day, dead: 0, blocked: 0, serverError: 0, unreachable: 0, parked: 0, other: 0 }
+        if (msg.includes('http 0') || msg.includes('consecutive')) byDayType[day].dead++
+        else if (msg.includes('http 403') || msg.includes('blocked') || msg.includes('bot')) byDayType[day].blocked++
+        else if (msg.includes('http 5') || msg.includes('server error')) byDayType[day].serverError++
+        else if (msg.includes('unreachable') || msg.includes('server down') || msg.includes('server not')) byDayType[day].unreachable++
+        else if (msg.includes('park')) byDayType[day].parked++
+        else byDayType[day].other++
       }
     }
 
@@ -871,6 +1077,7 @@ export const dashboardAlertStats = query({
       httpTypes,
       ageBuckets,
       byDay: Object.entries(byDay).sort((a, b) => a[0].localeCompare(b[0])).map(([date, v]) => ({ date, ...v })),
+      byDayType: Object.values(byDayType).sort((a, b) => a.date.localeCompare(b.date)),
       avgAgeDays: alerts.length > 0 ? totalAge / alerts.length : 0,
       totalAlerts: alerts.length,
     }
@@ -897,6 +1104,150 @@ export const riskMatrixSites = query({
   },
 })
 
+export const bulkUpdateAlertsByDomain = mutation({
+  args: {
+    updates: v.array(v.object({ domain: v.string(), action: v.string() })),
+  },
+  handler: async (ctx, { updates }) => {
+    let working = 0, dead = 0, inProgress = 0, ignored = 0, notFound = 0
+    for (const { domain, action } of updates) {
+      const site = await ctx.db.query('sites')
+        .withIndex('by_domain', q => q.eq('domain', domain.trim().toLowerCase()))
+        .first()
+      if (!site) { notFound++; continue }
+
+      const alert = await ctx.db.query('alerts')
+        .withIndex('by_site', q => q.eq('siteId', site._id))
+        .order('desc')
+        .filter(q => q.eq(q.field('dismissed'), false))
+        .first()
+      if (!alert) { notFound++; continue }
+
+      const a = action.trim().toLowerCase()
+      if (a === 'working') {
+        await ctx.db.patch(alert._id, { dismissed: true, dismissedAt: Date.now() })
+        working++
+      } else if (a === 'dead') {
+        await ctx.db.patch(alert._id, { workflowStatus: 'urgent', severity: 'critical' })
+        dead++
+      } else if (a === 'in_progress') {
+        await ctx.db.patch(alert._id, { workflowStatus: 'in_progress' })
+        inProgress++
+      } else if (a === 'ignore') {
+        await ctx.db.patch(alert._id, { dismissed: true, dismissedAt: Date.now() })
+        ignored++
+      } else {
+        notFound++
+      }
+    }
+    return { working, dead, inProgress, ignored, notFound }
+  },
+})
+
+export const requeueSitesBatch = mutation({
+  args: { siteIds: v.array(v.string()) },
+  handler: async (ctx, { siteIds }) => {
+    let requeued = 0
+    for (const siteId of siteIds) {
+      const site = await ctx.db.get(siteId as never)
+      if (site) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await ctx.db.patch(siteId as never, { lastCheckedAt: undefined } as any)
+        requeued++
+      }
+    }
+    return requeued
+  },
+})
+
+export const bulkDismissByDomainPrefix = mutation({
+  args: { prefix: v.string(), action: v.string() },
+  handler: async (ctx, { prefix, action }) => {
+    const p = prefix.trim().toLowerCase()
+    // Scan alerts table for matching domains
+    const alerts = await ctx.db.query('alerts')
+      .withIndex('by_dismissed_workflow', q => q.eq('dismissed', false))
+      .take(8192)
+    const matching = alerts.filter((a: { domain?: string }) => (a.domain ?? '').toLowerCase().startsWith(p))
+    let count = 0
+    for (const alert of matching) {
+      if (action === 'working' || action === 'ignore') {
+        await ctx.db.patch(alert._id, { dismissed: true, dismissedAt: Date.now() })
+      } else if (action === 'in_progress') {
+        await ctx.db.patch(alert._id, { workflowStatus: 'in_progress' })
+      } else if (action === 'urgent') {
+        await ctx.db.patch(alert._id, { workflowStatus: 'urgent' })
+      }
+      count++
+    }
+    return { count, prefix: p }
+  },
+})
+
+export const alertTypeTrend = query({
+  args: { nowMs: v.number() },
+  handler: async (ctx, { nowMs }) => {
+    const since = nowMs - 14 * 24 * 3600 * 1000
+    // Use by_dismissed index to read only active alerts — avoids scanning dismissed ones
+    const alerts = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .take(8192)
+
+    type DayEntry = { date: string; dead: number; blocked: number; serverError: number; unreachable: number; parked: number; other: number }
+    const days: Record<string, DayEntry> = {}
+
+    for (const a of alerts) {
+      if (a.createdAt < since) continue
+      const d = new Date(a.createdAt)
+      const key = `${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`
+      if (!days[key]) days[key] = { date: key, dead: 0, blocked: 0, serverError: 0, unreachable: 0, parked: 0, other: 0 }
+      const msg = (a.message ?? '').toLowerCase()
+      if (msg.includes('http 0') || msg.includes('consecutive')) days[key].dead++
+      else if (msg.includes('http 403') || msg.includes('blocked') || msg.includes('bot')) days[key].blocked++
+      else if (msg.includes('http 5') || msg.includes('server error')) days[key].serverError++
+      else if (msg.includes('unreachable') || msg.includes('server down') || msg.includes('server not')) days[key].unreachable++
+      else if (msg.includes('park')) days[key].parked++
+      else days[key].other++
+    }
+
+    return Object.values(days).sort((a, b) => a.date.localeCompare(b.date))
+  },
+})
+
+export const urgentBreakdown = query({
+  args: {},
+  handler: async (ctx) => {
+    const [urgent, inProgressRows] = await Promise.all([
+      ctx.db.query('alerts')
+        .withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'urgent'))
+        .take(8192),
+      ctx.db.query('alerts')
+        .withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'in_progress'))
+        .take(8192),
+    ])
+    let dead = 0, critical = 0
+    for (const a of urgent) {
+      const msg = (a.message ?? '').toLowerCase()
+      if (msg.includes('http 0') || msg.includes('consecutive')) dead++
+      else if (a.severity === 'critical') critical++
+    }
+    return { dead, critical, inProgress: inProgressRows.length }
+  },
+})
+
+export const alertWorkflowCounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const [newRows, urgentRows, inProgressRows, doneRows] = await Promise.all([
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'new')).take(8192),
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'urgent')).take(8192),
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'in_progress')).take(8192),
+      ctx.db.query('alerts').withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'done')).take(8192),
+    ])
+    return { new: newRows.length, urgent: urgentRows.length, in_progress: inProgressRows.length, done: doneRows.length }
+  },
+})
+
 // Called after each cron run to keep status counters accurate.
 // Avoids per-mutation adjustCounter OCC conflicts during bulk parallel checks.
 export const rebuildStatusCounters = internalMutation({
@@ -913,6 +1264,57 @@ export const rebuildStatusCounters = internalMutation({
         await ctx.db.insert('counters', { name: `status_${s}`, value: count })
       }
     }
+  },
+})
+
+export const rebuildCountersStep = internalMutation({
+  args: { cursor: v.optional(v.string()), counts: v.any() },
+  handler: async (ctx, { cursor, counts }) => {
+    const page = await ctx.db.query('sites')
+      .paginate({ cursor: cursor ?? null, numItems: 8000 })
+
+    const newCounts: Record<string, number> = { ...counts }
+    for (const site of page.page) {
+      const s = (site.status ?? 'Unknown') as string
+      newCounts[s] = (newCounts[s] ?? 0) + 1
+    }
+
+    if (page.isDone) {
+      for (const [status, count] of Object.entries(newCounts)) {
+        const name = `status_${status}`
+        const existing = await ctx.db.query('counters').withIndex('by_name', q => q.eq('name', name)).first()
+        if (existing) {
+          await ctx.db.patch(existing._id, { value: count as number })
+        } else {
+          await ctx.db.insert('counters', { name, value: count as number })
+        }
+      }
+      return { done: true, cursor: null as string | null, counts: newCounts }
+    }
+    return { done: false, cursor: page.continueCursor, counts: newCounts }
+  },
+})
+
+export const rebuildCountersChain = internalAction({
+  args: { cursor: v.optional(v.string()), counts: v.any() },
+  handler: async (ctx, { cursor, counts }) => {
+    const result: { done: boolean; cursor: string | null; counts: Record<string, number> } =
+      await ctx.runMutation(internal.sites.rebuildCountersStep, { cursor, counts })
+    if (!result.done && result.cursor) {
+      await ctx.scheduler.runAfter(0, internal.sites.rebuildCountersChain, {
+        cursor: result.cursor,
+        counts: result.counts,
+      })
+    }
+    return result
+  },
+})
+
+export const rebuildCounters = action({
+  args: {},
+  handler: async (ctx) => {
+    await ctx.scheduler.runAfter(0, internal.sites.rebuildCountersChain, { cursor: undefined, counts: {} })
+    return { started: true }
   },
 })
 
@@ -1007,5 +1409,297 @@ export const migrateAlertWorkflowStatus = action({
       cursor = result.cursor
     }
     return { total }
+  },
+})
+
+export const migrateDeadAlertsPage = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .paginate({ cursor: cursor ?? null, numItems: 200 })
+
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+    const cutoff = Date.now() - THIRTY_DAYS_MS
+
+    const PARKING_HOSTS = [
+      'atom.com', 'sedo.com', 'afternic.com', 'dan.com', 'hugedomains.com',
+      'namecheap.com', 'godaddy.com', 'flippa.com', 'brandpa.com', 'efty.com',
+      'squadhelp.com', 'undeveloped.com', 'uni.com', 'above.com', 'parkingcrew.com',
+      'bodis.com', 'domainnameshop.com', 'domainmarket.com',
+      // Additional marketplaces
+      'bloomup.com', 'bloom-up.com', 'brandseller.com', 'domainagents.com',
+      'netsol.com', 'register.com', 'networksolutions.com', 'sav.com', 'epik.com',
+      'porkbun.com', 'namebright.com', 'dynadot.com', 'uniregistry.com',
+      'domainholder.com', 'domaincapital.com', 'domainbrokers.com',
+    ]
+
+    // Multilingual "domain for sale" title signals
+    const SALE_TITLE_KEYWORDS = [
+      'domain for sale', 'buy this domain', 'this domain is for sale', 'domain is available for purchase',
+      'est à vendre', 'à vendre sur', 'domaine à vendre',   // French
+      'zu verkaufen', 'domain zu verkaufen', 'steht zum verkauf',  // German
+      'se vende', 'dominio en venta', 'en venta',           // Spanish
+      'te koop', 'domein te koop',                          // Dutch
+      'in vendita', 'dominio in vendita',                   // Italian
+      'à venda', 'domínio à venda',                         // Portuguese
+      'till salu', 'til salg',                              // Swedish / Danish / Norwegian
+      'продаётся', 'продається', 'домен продаётся',         // Russian / Ukrainian
+      'til salgs', 'zum kauf',                              // more DE/NO
+    ]
+
+    let dead = 0
+    for (const a of page.page) {
+      if (a.workflowStatus === 'dead' || a.workflowStatus === 'done') continue
+
+      const msg = (a.message ?? '').toLowerCase()
+
+      // Bot-blocked (403/429) = site may be alive for humans, skip
+      const isBotBlocked =
+        a.aiCategory === 'bot_blocked' ||
+        msg.includes('http 403') ||
+        msg.includes('http 429')
+      if (isBotBlocked) continue
+
+      // Check recent history — if any 403/429 in last 5 checks → bot-blocked, not dead
+      const recentHistory = await ctx.db.query('checkHistory')
+        .withIndex('by_site', q => q.eq('siteId', a.siteId))
+        .order('desc')
+        .take(5)
+      const wasBlocked = recentHistory.some(h => h.httpStatus === 403 || h.httpStatus === 429)
+      if (wasBlocked) continue
+
+      // High-confidence dead from message alone
+      const deadByMessage =
+        (msg.includes('http 0') && msg.includes('consecutive')) ||
+        msg.includes('parked') ||
+        msg.includes('parking')
+
+      if (deadByMessage) {
+        await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+        dead++
+        continue
+      }
+
+      // Join to sites table for full data
+      const site = await ctx.db.get(a.siteId)
+      if (!site) continue
+
+      // Page title contains "for sale" in any language → dead
+      const titleLower = (site.pageTitle ?? '').toLowerCase()
+      const deadByTitle = titleLower.length > 0 && SALE_TITLE_KEYWORDS.some(kw => titleLower.includes(kw))
+      if (deadByTitle) {
+        await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+        dead++
+        continue
+      }
+
+      // Redirect to known parking/domain-broker platform → dead
+      if (site.redirectUrl) {
+        try {
+          const redirectHost = new URL(site.redirectUrl).hostname.replace(/^www\./, '')
+          if (PARKING_HOSTS.some(h => redirectHost === h || redirectHost.endsWith('.' + h))) {
+            await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+            dead++
+            continue
+          }
+        } catch { /* invalid URL, skip */ }
+      }
+
+      // Only HTTP 0 (no connection at all) counts as "dead by site data"
+      // HTTP 5xx means the server IS responding — keep in Urgent, not Dead
+      const httpStatus = site.httpStatus ?? 0
+      const consecutive = site.consecutiveFailures ?? 0
+      const isCompletelyUnreachable = httpStatus === 0 || httpStatus === 404
+
+      // Repeated HTTP 0 failures with no recent success → dead
+      const deadBySite =
+        isCompletelyUnreachable && (
+          consecutive >= 5 ||
+          (site.lastSuccessAt != null && site.lastSuccessAt < cutoff) ||
+          (site.lastSuccessAt == null && site.lastCheckedAt != null && site.lastCheckedAt < cutoff)
+        )
+
+      if (deadBySite) {
+        await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+        dead++
+      }
+    }
+    return { patched: dead, isDone: page.isDone, cursor: page.continueCursor }
+  },
+})
+
+export const revertBlockedFromDeadPage = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'dead'))
+      .paginate({ cursor: cursor ?? null, numItems: 200 })
+
+    let reverted = 0
+    for (const a of page.page) {
+      const msg = (a.message ?? '').toLowerCase()
+
+      // bot_blocked or 403 in message → alive but blocked
+      const isBlocked = a.aiCategory === 'bot_blocked' || msg.includes('http 403')
+      if (isBlocked) {
+        await ctx.db.patch(a._id, { workflowStatus: 'urgent' })
+        reverted++
+        continue
+      }
+
+      // Check recent history for 403/429 or 5xx (server responding = not dead)
+      const recentHistory = await ctx.db.query('checkHistory')
+        .withIndex('by_site', q => q.eq('siteId', a.siteId))
+        .order('desc')
+        .take(5)
+      const wasBlockedOrErroring = recentHistory.some(
+        h => h.httpStatus === 403 || h.httpStatus === 429 || (h.httpStatus !== undefined && h.httpStatus >= 500)
+      )
+      if (wasBlockedOrErroring) {
+        await ctx.db.patch(a._id, { workflowStatus: 'urgent' })
+        reverted++
+        continue
+      }
+
+      // Site has HTTP 5xx currently → server responds, not dead
+      const site = await ctx.db.get(a.siteId)
+      if (site && (site.httpStatus ?? 0) >= 500) {
+        await ctx.db.patch(a._id, { workflowStatus: 'urgent' })
+        reverted++
+      }
+    }
+    return { reverted, isDone: page.isDone, cursor: page.continueCursor }
+  },
+})
+
+export const revertBlockedFromDead = action({
+  args: {},
+  handler: async (ctx) => {
+    let cursor: string | undefined = undefined
+    let total = 0
+    let done = false
+    while (!done) {
+      const result: any = await ctx.runMutation(internal.sites.revertBlockedFromDeadPage, { cursor })
+      total += result.reverted
+      done = result.isDone
+      cursor = result.cursor
+    }
+    return { total }
+  },
+})
+
+export const migrateDeadAlerts = action({
+  args: {},
+  handler: async (ctx) => {
+    let cursor: string | undefined = undefined
+    let total = 0
+    let done = false
+    while (!done) {
+      const result: any = await ctx.runMutation(internal.sites.migrateDeadAlertsPage, { cursor })
+      total += result.patched
+      done = result.isDone
+      cursor = result.cursor
+    }
+    return { total }
+  },
+})
+
+// Rules Agent: runs after reverify — Fix Blocked then Move Dead
+export const runDailyAlertCleanup = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    // Step 1: Fix Blocked — return wrongly-dead sites (403/5xx) back to Urgent
+    let cursor: string | undefined = undefined
+    let reverted = 0
+    let done = false
+    while (!done) {
+      const r: any = await ctx.runMutation(internal.sites.revertBlockedFromDeadPage, { cursor })
+      reverted += r.reverted
+      done = r.isDone
+      cursor = r.cursor
+    }
+
+    // Step 2: Move Dead — classify confirmed dead alerts into Dead column
+    cursor = undefined
+    let moved = 0
+    done = false
+    while (!done) {
+      const r: any = await ctx.runMutation(internal.sites.migrateDeadAlertsPage, { cursor })
+      moved += r.patched
+      done = r.isDone
+      cursor = r.cursor
+    }
+
+    return { reverted, moved }
+  },
+})
+
+export const debugSiteCount = query({
+  args: {},
+  handler: async (ctx) => {
+    const sample = await ctx.db.query('sites')
+      .filter(q => q.gt(q.field('_creationTime'), 0))
+      .take(10)
+    const total = await ctx.db.query('sites').take(8192)
+    return { sampleCount: sample.length, firstStatuses: sample.map(s => s.status), totalTake8192: total.length }
+  },
+})
+
+export const testRebuildStep = action({
+  args: { cursor: v.optional(v.string()), counts: v.optional(v.any()) },
+  handler: async (ctx, { cursor, counts }) => {
+    const result: { done: boolean; cursor: string | null; counts: Record<string, number> } =
+      await ctx.runMutation(internal.sites.rebuildCountersStep, { cursor, counts: counts ?? {} })
+    return result
+  },
+})
+
+// Deduplication: keep only the newest open alert per site, dismiss older duplicates
+export const deduplicateAlertsPage = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .paginate({ cursor: cursor ?? null, numItems: 500 })
+
+    // Group alerts in this page by siteId
+    const bySite = new Map<string, typeof page.page>()
+    for (const a of page.page) {
+      const key = a.siteId as string
+      if (!bySite.has(key)) bySite.set(key, [])
+      bySite.get(key)!.push(a)
+    }
+
+    let dismissed = 0
+    const now = Date.now()
+    for (const [, alerts] of bySite) {
+      if (alerts.length <= 1) continue
+      // Sort descending by createdAt — keep the newest
+      alerts.sort((a, b) => b.createdAt - a.createdAt)
+      const [_keep, ...dupes] = alerts
+      for (const dupe of dupes) {
+        await ctx.db.patch(dupe._id, { dismissed: true, dismissedAt: now })
+        dismissed++
+      }
+    }
+    await adjustCounter(ctx, 'alerts_active', -dismissed)
+    return { dismissed, isDone: page.isDone, cursor: page.continueCursor }
+  },
+})
+
+export const deduplicateAlerts = action({
+  args: {},
+  handler: async (ctx) => {
+    let cursor: string | undefined = undefined
+    let total = 0
+    let done = false
+    while (!done) {
+      const result: any = await ctx.runMutation(internal.sites.deduplicateAlertsPage, { cursor })
+      total += result.dismissed
+      done = result.isDone
+      cursor = result.cursor
+    }
+    return { dismissed: total }
   },
 })

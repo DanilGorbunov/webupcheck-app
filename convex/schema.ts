@@ -27,6 +27,11 @@ export default defineSchema({
     metaDescription: v.optional(v.string()),
     isParked: v.optional(v.boolean()),
     responseTimeMs: v.optional(v.number()),
+    viaProxy: v.optional(v.boolean()),
+    // Extra scraped data
+    wordCount: v.optional(v.number()),
+    ogImage: v.optional(v.string()),
+    canonical: v.optional(v.string()),
     // Retry / failure tracking
     consecutiveFailures: v.optional(v.number()),
     lastSuccessAt: v.optional(v.number()),
@@ -67,6 +72,8 @@ export default defineSchema({
     aiCategory: v.optional(v.string()),     // site_down | domain_parked | cdn_issue | ssl_expiry | redirect_change | server_error | unknown
     aiPriority: v.optional(v.number()),     // 0-100
     aiReason: v.optional(v.string()),
+    dr: v.optional(v.number()),             // Domain Rating at alert creation time
+    organicTraffic: v.optional(v.number()), // Organic Traffic at alert creation time
   })
     .index('by_site', ['siteId'])
     .index('by_dismissed', ['dismissed'])
