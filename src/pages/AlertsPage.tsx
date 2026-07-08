@@ -322,7 +322,7 @@ const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBef
               style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', textDecoration: 'none', lineHeight: 1.3 }}
               onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
               onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
-              onClick={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onSelect(alert) }}
             >
               {alert.domain}
             </a>
@@ -395,7 +395,7 @@ const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBef
                 href={`https://${alert.domain}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); onSelect(alert) }}
                 style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: 600, padding: '4px 6px', background: 'white', border: '1px solid #D1D5DB', borderRadius: 4, color: '#374151', textDecoration: 'none', cursor: 'pointer' }}
               >
                 Open Site →
