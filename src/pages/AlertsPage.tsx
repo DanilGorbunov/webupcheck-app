@@ -1,4 +1,25 @@
 import { useState, useMemo, useCallback, useRef, memo, useDeferredValue, useEffect, type ReactNode } from 'react'
+
+function Favicon({ domain, bg, color }: { domain: string; bg: string; color: string }) {
+  const [failed, setFailed] = useState(false)
+  const hostname = (domain ?? '').split('/')[0]
+  const letter = (hostname[0] ?? '?').toUpperCase()
+  const fallback = (
+    <div style={{ width: 14, height: 14, borderRadius: 2, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 800, color, flexShrink: 0, lineHeight: 1 }}>
+      {letter}
+    </div>
+  )
+  if (failed) return fallback
+  return (
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+      width={14}
+      height={14}
+      style={{ borderRadius: 2, flexShrink: 0, display: 'block', objectFit: 'contain' }}
+      onError={() => setFailed(true)}
+    />
+  )
+}
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
 
@@ -313,9 +334,7 @@ const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBef
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-            <div style={{ width: 14, height: 14, borderRadius: 2, background: st.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 800, color: st.color, flexShrink: 0, lineHeight: 1 }}>
-              {(alert.domain?.[0] ?? '?').toUpperCase()}
-            </div>
+            <Favicon domain={alert.domain ?? ''} bg={st.bg} color={st.color} />
             <a
               href={`https://${alert.domain}`}
               target="_blank"
