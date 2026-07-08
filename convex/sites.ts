@@ -317,6 +317,7 @@ export const saveCheckResult = mutation({
         return
       }
 
+      const isHttp0Dead = http === 0 && !effectiveBotBlocked
       const subAlertId = await ctx.db.insert('alerts', {
         siteId: args.siteId,
         domain: rootDomain,
@@ -325,7 +326,7 @@ export const saveCheckResult = mutation({
         subdomains: [site.domain],
         createdAt: Date.now(),
         dismissed: false,
-        workflowStatus: severity === 'critical' ? 'urgent' : 'new',
+        workflowStatus: isHttp0Dead ? 'dead' : severity === 'critical' ? 'urgent' : 'new',
         ...seoFields,
       })
       await adjustCounter(ctx, 'alerts_active', 1)
@@ -339,15 +340,19 @@ export const saveCheckResult = mutation({
       .filter(q => q.eq(q.field('dismissed'), false))
       .first()
 
+    const isHttp0Dead = http === 0 && !effectiveBotBlocked
     if (existingAlert) {
+      const currentWf = existingAlert.workflowStatus ?? 'new'
+      const wfPatch = isHttp0Dead && !['dead', 'done', 'ignored'].includes(currentWf)
+        ? { workflowStatus: 'dead' }
+        : severity === 'critical' && currentWf === 'new'
+        ? { workflowStatus: 'urgent' }
+        : {}
       await ctx.db.patch(existingAlert._id, {
         severity,
         message,
         ...(effectiveBotBlocked ? { aiCategory: 'bot_blocked' } : {}),
-        // Escalate workflowStatus if severity went up (never downgrade user's triage)
-        ...(severity === 'critical' && existingAlert.workflowStatus === 'new'
-          ? { workflowStatus: 'urgent' }
-          : {}),
+        ...wfPatch,
       })
       if (!effectiveBotBlocked) {
         await ctx.scheduler.runAfter(0, internal.ai.classifyAlert, { alertId: existingAlert._id })
@@ -362,7 +367,7 @@ export const saveCheckResult = mutation({
       message,
       createdAt: Date.now(),
       dismissed: false,
-      workflowStatus: severity === 'critical' ? 'urgent' : 'new',
+      workflowStatus: isHttp0Dead ? 'dead' : severity === 'critical' ? 'urgent' : 'new',
       ...(effectiveBotBlocked ? { aiCategory: 'bot_blocked' } : {}),
       ...seoFields,
     })
@@ -1471,7 +1476,8 @@ export const migrateDeadAlertsPage = internalMutation({
 
       // High-confidence dead from message alone
       const deadByMessage =
-        (msg.includes('http 0') && msg.includes('consecutive')) ||
+        msg.includes('http 0') ||
+        msg.includes('consecutive') ||
         msg.includes('parked') ||
         msg.includes('parking')
 
