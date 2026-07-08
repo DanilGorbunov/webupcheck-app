@@ -1784,7 +1784,7 @@ export const getBlockedAlertsPage = internalQuery({
 })
 
 export const updateBrowserChecked = internalMutation({
-  args: { alertId: v.id('alerts'), browserStatus: v.string() },
+  args: { alertId: v.string(), browserStatus: v.string() },
   handler: async (ctx, { alertId, browserStatus }) => {
     const patch: Record<string, unknown> = { aiCategory: `browser_${browserStatus}` }
     if (browserStatus === 'alive') {
@@ -1795,7 +1795,8 @@ export const updateBrowserChecked = internalMutation({
       patch.workflowStatus = 'urgent'
     }
     // timeout → no status change, just update aiCategory
-    await ctx.db.patch(alertId, patch)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await ctx.db.patch(alertId as any, patch)
   },
 })
 
