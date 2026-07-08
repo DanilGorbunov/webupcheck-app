@@ -286,6 +286,12 @@ export const saveCheckResult = mutation({
     }
     const effectiveBotBlocked = isBotBlocked || isCloudflareBlock
 
+    // Sites with real SEO signals are likely temporarily unreachable, not dead.
+    // DR ≥ 20 or any organic traffic or audience = real publisher site → keep in Urgent.
+    const siteIsReal = (site.dr ?? 0) >= 20 || (site.organicTraffic ?? 0) > 0 || (site.audience ?? 0) > 0
+    // HTTP 0 on a real site = false positive (Cloudflare/geo block), not dead
+    const isHttp0Dead = http === 0 && !effectiveBotBlocked && !siteIsReal
+
     // Snapshot SEO metrics from site at alert creation time
     const seoFields = {
       ...(site.dr != null ? { dr: site.dr } : {}),
@@ -317,7 +323,6 @@ export const saveCheckResult = mutation({
         return
       }
 
-      const isHttp0Dead = http === 0 && !effectiveBotBlocked
       const subAlertId = await ctx.db.insert('alerts', {
         siteId: args.siteId,
         domain: rootDomain,
@@ -340,7 +345,6 @@ export const saveCheckResult = mutation({
       .filter(q => q.eq(q.field('dismissed'), false))
       .first()
 
-    const isHttp0Dead = http === 0 && !effectiveBotBlocked
     if (existingAlert) {
       const currentWf = existingAlert.workflowStatus ?? 'new'
       const wfPatch = isHttp0Dead && !['dead', 'done', 'ignored'].includes(currentWf)
@@ -1474,6 +1478,15 @@ export const migrateDeadAlertsPage = internalMutation({
       const wasBlocked = recentHistory.some(h => h.httpStatus === 403 || h.httpStatus === 429)
       if (wasBlocked) continue
 
+      // SEO guard: sites with real metrics are likely temporarily down, not dead.
+      // Parked domains are the exception — dead regardless of historic SEO.
+      const isParkedMsg = msg.includes('parked') || msg.includes('parking')
+      if (!isParkedMsg) {
+        const alertDr = a.dr ?? 0
+        const alertOt = a.organicTraffic ?? 0
+        if (alertDr >= 20 || alertOt > 0) continue
+      }
+
       // High-confidence dead from message alone
       const deadByMessage =
         msg.includes('http 0') ||
@@ -1490,6 +1503,9 @@ export const migrateDeadAlertsPage = internalMutation({
       // Join to sites table for full data
       const site = await ctx.db.get(a.siteId)
       if (!site) continue
+
+      // Audience not stored on alert — check site directly
+      if (!isParkedMsg && (site.audience ?? 0) > 0) continue
 
       // Page title contains "for sale" in any language → dead
       const titleLower = (site.pageTitle ?? '').toLowerCase()
