@@ -45,6 +45,7 @@ const migrateDeadAlertsFn      = makeFunctionReference<'action', Record<string, 
 const revertBlockedFromDeadFn   = makeFunctionReference<'action', Record<string, never>, { total: number }>('sites:revertBlockedFromDead')
 const revertCriticalFromDeadFn  = makeFunctionReference<'action', Record<string, never>, { total: number }>('sites:revertCriticalFromDead')
 const deduplicateAlertsFn      = makeFunctionReference<'action', Record<string, never>, { dismissed: number }>('sites:deduplicateAlerts')
+const checkBlockedSitesFn      = makeFunctionReference<'action', { vercelUrl: string; maxSites?: number }, { total: number; alive: number; parked: number; errors: number; timeouts: number }>('sites:checkBlockedSites')
 
 interface Props { onViewSite: (s: DbSite) => void }
 
@@ -1148,6 +1149,8 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
   const [reverifyResult, setReverifyResult] = useState<{ dismissed: number; stillDead: number } | null>(null)
   const [deduplicating, setDeduplicating] = useState(false)
   const [deduplicateResult, setDeduplicateResult] = useState<{ dismissed: number } | null>(null)
+  const [checkingBlocked, setCheckingBlocked] = useState(false)
+  const [checkBlockedResult, setCheckBlockedResult] = useState<{ total: number; alive: number; parked: number; errors: number; timeouts: number } | null>(null)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ working: number; dead: number; inProgress: number; ignored: number; notFound: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1192,6 +1195,7 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
   const revertCriticalFromDead = useAction(revertCriticalFromDeadFn)
   const startReverifyAll = useAction(startReverifyAllFn)
   const deduplicateAlerts = useAction(deduplicateAlertsFn)
+  const checkBlockedSites = useAction(checkBlockedSitesFn)
   const bulkUpdate = useMutation(bulkUpdateFn)
   const bulkPrefix = useMutation(bulkPrefixFn)
   const updateWorkflow = useMutation(updateWorkflowFn)
@@ -1267,6 +1271,16 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
       setDeduplicateResult(r)
     } catch { /* ignore */ }
     setDeduplicating(false)
+  }
+
+  async function handleCheckBlocked() {
+    setCheckingBlocked(true)
+    setCheckBlockedResult(null)
+    try {
+      const r = await checkBlockedSites({ vercelUrl: window.location.origin, maxSites: 50 })
+      setCheckBlockedResult(r)
+    } catch { /* ignore */ }
+    setCheckingBlocked(false)
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1521,6 +1535,11 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
               ✓ {deduplicateResult.dismissed} dupes dismissed
             </span>
           )}
+          {checkBlockedResult && (
+            <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 500 }}>
+              🎭 {checkBlockedResult.alive}✓ {checkBlockedResult.parked}💀 {checkBlockedResult.errors}✗ of {checkBlockedResult.total}
+            </span>
+          )}
           {importResult && (
             <span style={{ fontSize: 11, color: '#374151', fontWeight: 500 }}>
               ↑ {importResult.working}w · {importResult.dead}d · {importResult.inProgress}ip · {importResult.ignored}ign · {importResult.notFound} miss
@@ -1568,6 +1587,14 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
             style={{ padding: '5px 12px', background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: reverifying ? 'default' : 'pointer', opacity: reverifying ? 0.7 : 1, fontFamily: 'inherit' }}
           >
             {reverifying ? 'Starting…' : '🔄 Re-verify All'}
+          </button>
+          <button
+            onClick={handleCheckBlocked}
+            disabled={checkingBlocked}
+            title="Browser-check 403-blocked sites via Playwright to classify as alive/parked/error"
+            style={{ padding: '5px 12px', background: '#F0FDFA', color: '#0F766E', border: '1px solid #99F6E4', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: checkingBlocked ? 'default' : 'pointer', opacity: checkingBlocked ? 0.7 : 1, fontFamily: 'inherit' }}
+          >
+            {checkingBlocked ? 'Checking…' : '🎭 Check Blocked'}
           </button>
           <button
             onClick={handleDeduplicate}

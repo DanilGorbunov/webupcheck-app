@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sparticuz/chromium-min": "^147.0.0",
     "convex": "^1.42.1",
     "https-proxy-agent": "^9.1.0",
     "node-fetch": "^3.3.2",
+    "puppeteer-core": "^25.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

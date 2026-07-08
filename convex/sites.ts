@@ -1766,3 +1766,76 @@ export const deduplicateAlerts = action({
     return { dismissed: total }
   },
 })
+
+// Browser-check for bot_blocked (403) sites via Vercel Playwright function
+export const getBlockedAlertsPage = internalQuery({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed', q => q.eq('dismissed', false))
+      .filter(q => q.eq(q.field('aiCategory'), 'bot_blocked'))
+      .paginate({ cursor: cursor ?? null, numItems: 30 })
+    return {
+      items: page.page.map(a => ({ id: a._id, domain: a.domain as string })),
+      isDone: page.isDone,
+      cursor: page.continueCursor,
+    }
+  },
+})
+
+export const updateBrowserChecked = internalMutation({
+  args: { alertId: v.id('alerts'), browserStatus: v.string() },
+  handler: async (ctx, { alertId, browserStatus }) => {
+    const patch: Record<string, unknown> = { aiCategory: `browser_${browserStatus}` }
+    if (browserStatus === 'alive') {
+      patch.workflowStatus = 'done'
+    } else if (browserStatus === 'parked') {
+      patch.workflowStatus = 'dead'
+    } else if (browserStatus === 'error') {
+      patch.workflowStatus = 'urgent'
+    }
+    // timeout → no status change, just update aiCategory
+    await ctx.db.patch(alertId, patch)
+  },
+})
+
+export const checkBlockedSites = action({
+  args: { vercelUrl: v.string(), maxSites: v.optional(v.number()) },
+  handler: async (ctx, { vercelUrl, maxSites = 200 }) => {
+    let cursor: string | undefined = undefined
+    let total = 0, alive = 0, parked = 0, errors = 0, timeouts = 0
+
+    while (total < maxSites) {
+      const batch: any = await ctx.runQuery(internal.sites.getBlockedAlertsPage, { cursor })
+      if (!batch.items.length) break
+
+      for (let i = 0; i < batch.items.length && total < maxSites; i += 5) {
+        const chunk = batch.items.slice(i, i + 5)
+        await Promise.all(
+          chunk.map(async ({ id, domain }: { id: string; domain: string }) => {
+            try {
+              const r = await fetch(
+                `${vercelUrl}/api/check-browser?domain=${encodeURIComponent(domain)}`,
+                { signal: AbortSignal.timeout(50000) }
+              )
+              if (!r.ok) { errors++; return }
+              const data: any = await r.json()
+              const status: string = data.status ?? 'error'
+              await ctx.runMutation(internal.sites.updateBrowserChecked, { alertId: id, browserStatus: status })
+              if (status === 'alive') alive++
+              else if (status === 'parked') parked++
+              else if (status === 'timeout') timeouts++
+              else errors++
+            } catch { errors++ }
+            total++
+          })
+        )
+      }
+
+      if (batch.isDone || total >= maxSites) break
+      cursor = batch.cursor
+    }
+
+    return { total, alive, parked, errors, timeouts }
+  },
+})
