@@ -257,7 +257,7 @@ const GroupCard = memo(function GroupCard({ root, alerts, worstLabel, onDismissA
   )
 })
 
-const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBefore, isOverAfter, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown, onSelect, onScreenshot, isSelected }: {
+const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBefore, isOverAfter, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown, onSelect, onHighlight, onScreenshot, isSelected }: {
   alert: DbAlert
   onDragStart: (id: string) => void
   col?: WorkflowCol
@@ -268,6 +268,7 @@ const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBef
   onCardDragOver: (id: string, pos: 'before' | 'after') => void
   onCardDragLeave: () => void
   onSelect: (a: DbAlert) => void
+  onHighlight: (id: string) => void
   onScreenshot: (domain: string) => void
   isSelected?: boolean
 }) {
@@ -322,7 +323,7 @@ const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBef
               style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', textDecoration: 'none', lineHeight: 1.3 }}
               onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
               onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
-              onClick={e => { e.stopPropagation(); onSelect(alert) }}
+              onClick={e => { e.stopPropagation(); onHighlight(alert._id) }}
             >
               {alert.domain}
             </a>
@@ -395,7 +396,7 @@ const KanbanCard = memo(function KanbanCard({ alert, onDragStart, col, isOverBef
                 href={`https://${alert.domain}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={e => { e.stopPropagation(); onSelect(alert) }}
+                onClick={e => { e.stopPropagation(); onHighlight(alert._id) }}
                 style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: 600, padding: '4px 6px', background: 'white', border: '1px solid #D1D5DB', borderRadius: 4, color: '#374151', textDecoration: 'none', cursor: 'pointer' }}
               >
                 Open Site →
@@ -507,7 +508,7 @@ function exportToCsv(alerts: DbAlert[], colLabel: string, subTab: string | null,
   URL.revokeObjectURL(url)
 }
 
-function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOver, onDragOver, onDragLeave, onDragStart, dragOverCard, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown, onSelect, onDismissAll, onScreenshot, onSelectGroup, onDismissGroup, selectedAlertId }: {
+function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOver, onDragOver, onDragLeave, onDragStart, dragOverCard, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown, onSelect, onHighlight, onDismissAll, onScreenshot, onSelectGroup, onDismissGroup, selectedAlertId }: {
   col: typeof COLUMNS[0]
   alerts: DbAlert[]
   visibleCount: number
@@ -523,6 +524,7 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
   onDismiss: (id: string) => void
   onMarkDown: (id: string) => void
   onSelect: (a: DbAlert) => void
+  onHighlight: (id: string) => void
   onDismissAll?: () => void
   onScreenshot: (domain: string) => void
   onSelectGroup: (root: string, alerts: DbAlert[]) => void
@@ -743,6 +745,7 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
               onDismiss={onDismiss}
               onMarkDown={onMarkDown}
               onSelect={onSelect}
+              onHighlight={onHighlight}
               onScreenshot={onScreenshot}
               isSelected={selectedAlertId === item.alert._id}
             />
@@ -1112,6 +1115,7 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
   const [countryOpen, setCountryOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedAlert, setSelectedAlert] = useState<DbAlert | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [screenshotDomain, setScreenshotDomain] = useState<string | null>(null)
   const [selectedGroup, setSelectedGroup] = useState<{ root: string; alerts: DbAlert[] } | null>(null)
 
@@ -1645,12 +1649,13 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
             onCardDragLeave={handleCardDragLeave}
             onDismiss={handleDismissOne}
             onMarkDown={handleMarkDown}
-            onSelect={setSelectedAlert}
+            onSelect={a => { setSelectedAlert(a); setHighlightedId(a._id) }}
+            onHighlight={setHighlightedId}
             onDismissAll={col.id === 'dead' ? handleDismissAllDead : undefined}
             onScreenshot={setScreenshotDomain}
             onSelectGroup={(root, grpAlerts) => setSelectedGroup({ root, alerts: grpAlerts })}
             onDismissGroup={handleDismissGroup}
-            selectedAlertId={selectedAlert?._id}
+            selectedAlertId={highlightedId ?? selectedAlert?._id}
           />
         ))}
       </div>
