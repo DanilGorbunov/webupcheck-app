@@ -21,7 +21,8 @@ const updateWorkflowFn      = makeFunctionReference<'mutation', { alertId: Conve
 const dismissAlertFn        = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
 const markBotBlockedDownFn  = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:markBotBlockedAsDown')
 const migrateDeadAlertsFn      = makeFunctionReference<'action', Record<string, never>, { total: number }>('sites:migrateDeadAlerts')
-const revertBlockedFromDeadFn  = makeFunctionReference<'action', Record<string, never>, { total: number }>('sites:revertBlockedFromDead')
+const revertBlockedFromDeadFn   = makeFunctionReference<'action', Record<string, never>, { total: number }>('sites:revertBlockedFromDead')
+const revertCriticalFromDeadFn  = makeFunctionReference<'action', Record<string, never>, { total: number }>('sites:revertCriticalFromDead')
 const deduplicateAlertsFn      = makeFunctionReference<'action', Record<string, never>, { dismissed: number }>('sites:deduplicateAlerts')
 
 interface Props { onViewSite: (s: DbSite) => void }
@@ -122,7 +123,7 @@ function getHttpCode(msg: string): string | null {
 
 function getSeverityStyle(a: DbAlert) {
   const msg = (a.message ?? '').toLowerCase()
-  const dead = msg.includes('http 0') || msg.includes('consecutive')
+  const dead = msg.includes('http 0') || msg.includes('consecutive') || msg.includes('park')
   if (dead) return { label: 'DEAD', color: '#DC2626', bg: '#FEE2E2', border: '#DC2626' }
   if (a.severity === 'critical') return { label: 'CRITICAL', color: '#DC2626', bg: '#FEE2E2', border: '#DC2626' }
   if (a.severity === 'warning') {
@@ -1118,6 +1119,8 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
   const [migrateResult, setMigrateResult] = useState<{ total: number } | null>(null)
   const [reverting, setReverting] = useState(false)
   const [revertResult, setRevertResult] = useState<{ total: number } | null>(null)
+  const [revertingCritical, setRevertingCritical] = useState(false)
+  const [revertCriticalResult, setRevertCriticalResult] = useState<{ total: number } | null>(null)
   const [reverifying, setReverifying] = useState(false)
   const [reverifyResult, setReverifyResult] = useState<{ dismissed: number; stillDead: number } | null>(null)
   const [deduplicating, setDeduplicating] = useState(false)
@@ -1162,7 +1165,8 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
 
 
   const migrateDeadAlerts = useAction(migrateDeadAlertsFn)
-  const revertBlockedFromDead = useAction(revertBlockedFromDeadFn)
+  const revertBlockedFromDead  = useAction(revertBlockedFromDeadFn)
+  const revertCriticalFromDead = useAction(revertCriticalFromDeadFn)
   const startReverifyAll = useAction(startReverifyAllFn)
   const deduplicateAlerts = useAction(deduplicateAlertsFn)
   const bulkUpdate = useMutation(bulkUpdateFn)
@@ -1179,6 +1183,17 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
       setMigrateResult(r)
     } catch { /* ignore */ }
     setMigrating(false)
+  }
+
+  async function handleRevertCritical() {
+    setRevertingCritical(true)
+    setRevertCriticalResult(null)
+    try {
+      const r = await revertCriticalFromDead({})
+      setRevertCriticalResult(r)
+    } finally {
+      setRevertingCritical(false)
+    }
   }
 
   async function handleRevertBlocked() {
@@ -1498,19 +1513,31 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
               ↩ {revertResult.total.toLocaleString()} → Urgent
             </span>
           )}
+          {revertCriticalResult && (
+            <span style={{ fontSize: 11, color: '#DC2626', fontWeight: 500 }}>
+              ↩ {revertCriticalResult.total.toLocaleString()} Critical → Urgent
+            </span>
+          )}
           <button
             onClick={handleMigrateDead}
-            disabled={migrating || reverting}
+            disabled={migrating || reverting || revertingCritical}
             style={{ padding: '5px 12px', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: migrating ? 'default' : 'pointer', opacity: migrating ? 0.7 : 1, fontFamily: 'inherit' }}
           >
             {migrating ? 'Moving…' : '💀 Move Dead'}
           </button>
           <button
             onClick={handleRevertBlocked}
-            disabled={reverting || migrating}
+            disabled={reverting || migrating || revertingCritical}
             style={{ padding: '5px 12px', background: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: reverting ? 'default' : 'pointer', opacity: reverting ? 0.7 : 1, fontFamily: 'inherit' }}
           >
             {reverting ? 'Reverting…' : '↩ Fix Blocked'}
+          </button>
+          <button
+            onClick={handleRevertCritical}
+            disabled={revertingCritical || migrating || reverting}
+            style={{ padding: '5px 12px', background: '#FFF1F2', color: '#BE123C', border: '1px solid #FECDD3', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: revertingCritical ? 'default' : 'pointer', opacity: revertingCritical ? 0.7 : 1, fontFamily: 'inherit' }}
+          >
+            {revertingCritical ? 'Moving…' : '🚨 Fix Critical'}
           </button>
           <button
             onClick={handleReverify}

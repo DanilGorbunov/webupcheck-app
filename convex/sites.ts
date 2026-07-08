@@ -322,7 +322,7 @@ export const saveCheckResult = mutation({
         siteId: args.siteId,
         domain: rootDomain,
         severity,
-        message: `Server down (subdomain: ${site.domain})`,
+        message: `Server down (subdomain: ${site.domain})${http === 0 ? ' — HTTP 0' : http > 0 ? ` — HTTP ${http}` : ''}`,
         subdomains: [site.domain],
         createdAt: Date.now(),
         dismissed: false,
@@ -1587,6 +1587,47 @@ export const revertBlockedFromDead = action({
     let done = false
     while (!done) {
       const result: any = await ctx.runMutation(internal.sites.revertBlockedFromDeadPage, { cursor })
+      total += result.reverted
+      done = result.isDone
+      cursor = result.cursor
+    }
+    return { total }
+  },
+})
+
+export const revertCriticalFromDeadPage = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('alerts')
+      .withIndex('by_dismissed_workflow', q => q.eq('dismissed', false).eq('workflowStatus', 'dead'))
+      .paginate({ cursor: cursor ?? null, numItems: 200 })
+
+    let reverted = 0
+    for (const a of page.page) {
+      const msg = (a.message ?? '').toLowerCase()
+      // Keep in Dead only if message clearly indicates dead (http 0, consecutive, parked)
+      const isConfirmedDead =
+        msg.includes('http 0') ||
+        msg.includes('consecutive') ||
+        msg.includes('park')
+      // If severity=critical but not confirmed dead by message → belongs in Urgent
+      if (!isConfirmedDead && a.severity === 'critical') {
+        await ctx.db.patch(a._id, { workflowStatus: 'urgent' })
+        reverted++
+      }
+    }
+    return { reverted, isDone: page.isDone, cursor: page.continueCursor }
+  },
+})
+
+export const revertCriticalFromDead = action({
+  args: {},
+  handler: async (ctx) => {
+    let cursor: string | undefined = undefined
+    let total = 0
+    let done = false
+    while (!done) {
+      const result: any = await ctx.runMutation(internal.sites.revertCriticalFromDeadPage, { cursor })
       total += result.reverted
       done = result.isDone
       cursor = result.cursor
