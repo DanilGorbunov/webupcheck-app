@@ -486,6 +486,7 @@ const DONE_COL_TABS = [
 const DEAD_COL_TABS = [
   { key: 'unchecked', label: 'Dead (Minus Checked)' },
   { key: 'checked',   label: 'Checked' },
+  { key: 'all_dead',  label: 'Dead' },
 ]
 
 const URGENT_PRIORITY_TABS = [
@@ -576,6 +577,7 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
       if (subTab) {
         if (subTab === 'unchecked') return !a.checked
         if (subTab === 'checked')   return a.checked === true
+        if (subTab === 'all_dead') return true
         if (subTab === 'fixed')   return a.workflowStatus !== 'ignored'
         if (subTab === 'ignored') return a.workflowStatus === 'ignored'
         if (subTab === 'critical' && sev !== 'CRITICAL') return false
@@ -595,6 +597,7 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
         if (!t.key) continue
         const match = t.key === 'unchecked' ? !a.checked
           : t.key === 'checked' ? a.checked === true
+          : t.key === 'all_dead' ? true
           : t.key === 'fixed'   ? a.workflowStatus !== 'ignored'
           : t.key === 'ignored' ? a.workflowStatus === 'ignored'
           : t.key === 'critical' ? sev === 'CRITICAL'
@@ -1387,7 +1390,10 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
     const buf = await file.arrayBuffer()
     const wb = XLSX.read(buf, { type: 'array' })
 
-    // Any sheet with "domain" + "Note" columns is a reviewed alerts export (Note: DEAD/Ok).
+    // Any sheet with "domain" + "Note" columns is a reviewed alerts export, whatever it's
+    // named (colleagues re-date the sheet name each time). The Note VALUE is what decides:
+    // "DEAD" = confirmed still dead, checked off and excluded from the active queue.
+    // "Ok" = came back / not actually dead, stays (or returns) to the active queue.
     // Other sheets (e.g. a separate Platforms/publisher list) are skipped automatically.
     const domainToChecked = new Map<string, boolean>()
     for (const sheetName of wb.SheetNames) {
@@ -1401,8 +1407,9 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
       for (const row of rows) {
         const domain = String(row[domainKey] ?? '').trim().toLowerCase()
         const note = String(row[noteKey] ?? '').trim().toLowerCase()
-        if (!domain || !note) continue
-        domainToChecked.set(domain, note === 'ok')
+        if (!domain) continue
+        if (note === 'dead') domainToChecked.set(domain, true)
+        else if (note === 'ok') domainToChecked.set(domain, false)
       }
     }
 
