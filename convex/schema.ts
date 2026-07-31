@@ -74,6 +74,7 @@ export default defineSchema({
     aiReason: v.optional(v.string()),
     dr: v.optional(v.number()),             // Domain Rating at alert creation time
     organicTraffic: v.optional(v.number()), // Organic Traffic at alert creation time
+    checked: v.optional(v.boolean()),       // reviewed by colleague via CSV/xlsx import as no longer needing attention
   })
     .index('by_site', ['siteId'])
     .index('by_dismissed', ['dismissed'])

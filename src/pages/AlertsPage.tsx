@@ -22,6 +22,7 @@ function Favicon({ domain, bg, color }: { domain: string; bg: string; color: str
 }
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { makeFunctionReference } from 'convex/server'
+import * as XLSX from 'xlsx'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbSite = any
@@ -37,6 +38,7 @@ const getLastReverifyLogFn  = makeFunctionReference<'query',    Record<string, n
 const startReverifyAllFn          = makeFunctionReference<'action', Record<string, never>, { started: boolean; message: string }>('checker:startReverifyAll')
 const checkDomainFromCountryFn    = makeFunctionReference<'action', { domain: string; country: string }, { httpStatus: number; responseTimeMs?: number; isParked: boolean; pageTitle?: string }>('checker:checkDomainFromCountry')
 const bulkUpdateFn          = makeFunctionReference<'mutation',  { updates: { domain: string; action: string }[] }, { working: number; dead: number; inProgress: number; ignored: number; notFound: number }>('sites:bulkUpdateAlertsByDomain')
+const bulkMarkCheckedFn     = makeFunctionReference<'mutation',  { updates: { domain: string; checked: boolean }[] }, { checked: number; unchecked: number; notFound: number }>('sites:bulkMarkAlertsChecked')
 const bulkPrefixFn          = makeFunctionReference<'mutation',  { prefix: string; action: string }, { count: number; prefix: string }>('sites:bulkDismissByDomainPrefix')
 const updateWorkflowFn      = makeFunctionReference<'mutation', { alertId: ConvexId; workflowStatus: string }, void>('sites:updateAlertWorkflow')
 const dismissAlertFn        = makeFunctionReference<'mutation', { alertId: ConvexId }, void>('sites:dismissAlert')
@@ -481,6 +483,11 @@ const DONE_COL_TABS = [
   { key: 'ignored', label: 'Ignored' },
 ]
 
+const DEAD_COL_TABS = [
+  { key: 'unchecked', label: 'Dead (Minus Checked)' },
+  { key: 'checked',   label: 'Checked' },
+]
+
 const URGENT_PRIORITY_TABS = [
   { key: null,   label: 'All' },
   { key: 'p75',  label: 'P75+' },
@@ -528,7 +535,7 @@ function exportToCsv(alerts: DbAlert[], colLabel: string, subTab: string | null,
   URL.revokeObjectURL(url)
 }
 
-function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOver, onDragOver, onDragLeave, onDragStart, dragOverCard, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown, onSelect, onHighlight, onDismissAll, onScreenshot, onSelectGroup, onDismissGroup, selectedAlertId }: {
+function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOver, onDragOver, onDragLeave, onDragStart, dragOverCard, onCardDragOver, onCardDragLeave, onDismiss, onMarkDown, onSelect, onHighlight, onDismissAll, onScreenshot, onSelectGroup, onDismissGroup, selectedAlertId, onImportChecked, importingChecked, importCheckedResult }: {
   col: typeof COLUMNS[0]
   alerts: DbAlert[]
   visibleCount: number
@@ -550,19 +557,25 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
   onSelectGroup: (root: string, alerts: DbAlert[]) => void
   onDismissGroup: (alerts: DbAlert[]) => void
   selectedAlertId?: string
+  onImportChecked?: (file: File) => void
+  importingChecked?: boolean
+  importCheckedResult?: { checked: number; unchecked: number; notFound: number } | null
 }) {
-  const [subTab, setSubTab] = useState<string | null>(null)
+  const [subTab, setSubTab] = useState<string | null>(col.id === 'dead' ? 'unchecked' : null)
   const [priorityTab, setPriorityTab] = useState<string | null>(null)
   const [priorityOpen, setPriorityOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const checkedFileInputRef = useRef<HTMLInputElement>(null)
 
-  const tabs = col.id === 'new' ? NEW_COL_TABS : col.id === 'urgent' ? URGENT_COL_TABS : col.id === 'done' ? DONE_COL_TABS : null
+  const tabs = col.id === 'new' ? NEW_COL_TABS : col.id === 'urgent' ? URGENT_COL_TABS : col.id === 'done' ? DONE_COL_TABS : col.id === 'dead' ? DEAD_COL_TABS : null
   const priorityTabs = col.id === 'urgent' ? URGENT_PRIORITY_TABS : null
 
   const filteredAlerts = useMemo(() => {
     return alerts.filter(a => {
       const sev = getSeverityStyle(a).label
       if (subTab) {
+        if (subTab === 'unchecked') return !a.checked
+        if (subTab === 'checked')   return a.checked === true
         if (subTab === 'fixed')   return a.workflowStatus !== 'ignored'
         if (subTab === 'ignored') return a.workflowStatus === 'ignored'
         if (subTab === 'critical' && sev !== 'CRITICAL') return false
@@ -580,7 +593,9 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
       const sev = getSeverityStyle(a).label
       for (const t of tabs) {
         if (!t.key) continue
-        const match = t.key === 'fixed'   ? a.workflowStatus !== 'ignored'
+        const match = t.key === 'unchecked' ? !a.checked
+          : t.key === 'checked' ? a.checked === true
+          : t.key === 'fixed'   ? a.workflowStatus !== 'ignored'
           : t.key === 'ignored' ? a.workflowStatus === 'ignored'
           : t.key === 'critical' ? sev === 'CRITICAL'
           : sev === t.key
@@ -589,6 +604,12 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
     }
     return counts
   }, [alerts, tabs])
+
+  const visibleTabs = tabs
+    ? col.id === 'dead'
+      ? tabs
+      : tabs.filter(t => !('dropdown' in t && t.dropdown) && (t.key === null || (tabCounts[t.key] ?? 0) > 0))
+    : []
 
   const priorityCounts = useMemo(() => {
     if (!priorityTabs) return {}
@@ -630,7 +651,37 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color, flexShrink: 0 }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{col.label}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 11, color: '#94A3B8' }}>{groupedItems.length}{(subTab || priorityTab) ? ` / ${allGroupedItems.length}` : ''}</span>
+            {col.id !== 'dead' && (
+              <span style={{ fontSize: 11, color: '#94A3B8' }}>{groupedItems.length}{(subTab || priorityTab) ? ` / ${allGroupedItems.length}` : ''}</span>
+            )}
+            {col.id === 'dead' && onImportChecked && (
+              <>
+                <input
+                  ref={checkedFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) onImportChecked(file)
+                  }}
+                />
+                <button
+                  onClick={() => checkedFileInputRef.current?.click()}
+                  disabled={importingChecked}
+                  title="Import checked/dead review (.xlsx)"
+                  style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #E2E8F0', background: '#F0FDF4', cursor: importingChecked ? 'default' : 'pointer', fontSize: 10, fontWeight: 600, color: '#16A34A', fontFamily: 'inherit', opacity: importingChecked ? 0.7 : 1 }}
+                >
+                  {importingChecked ? 'Importing…' : '↑ Import Checked'}
+                </button>
+                {importCheckedResult && (
+                  <span style={{ fontSize: 10, color: '#16A34A', fontWeight: 600 }}>
+                    ✓ {importCheckedResult.checked} checked · {importCheckedResult.notFound} miss
+                  </span>
+                )}
+              </>
+            )}
             {onDismissAll && filteredAlerts.length > 0 && (
               <button
                 onClick={onDismissAll}
@@ -655,10 +706,10 @@ function KanbanColumn({ col, alerts, visibleCount, onShowMore, onDrop, isDragOve
         {col.sub && <div style={{ fontSize: 10, color: col.color, opacity: 0.7, paddingLeft: 14, marginTop: 2 }}>{col.sub}</div>}
         {tabs && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, alignItems: 'center' }}>
-            {tabs.filter(t => !('dropdown' in t && t.dropdown) && (t.key === null || (tabCounts[t.key] ?? 0) > 0)).map(t => (
+            {visibleTabs.map(t => (
               <button
                 key={String(t.key)}
-                onClick={() => setSubTab(subTab === t.key ? null : t.key)}
+                onClick={() => setSubTab(col.id === 'dead' ? t.key : (subTab === t.key ? null : t.key))}
                 style={{
                   padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px solid',
                   borderColor: subTab === t.key ? col.color : '#E2E8F0',
@@ -1154,6 +1205,8 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ working: number; dead: number; inProgress: number; ignored: number; notFound: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importingChecked, setImportingChecked] = useState(false)
+  const [importCheckedResult, setImportCheckedResult] = useState<{ checked: number; unchecked: number; notFound: number } | null>(null)
   const [prefixModal, setPrefixModal] = useState(false)
   const [prefixInput, setPrefixInput] = useState('')
   const [prefixAction, setPrefixAction] = useState<'working' | 'dead' | 'urgent'>('working')
@@ -1197,6 +1250,7 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
   const deduplicateAlerts = useAction(deduplicateAlertsFn)
   const checkBlockedSites = useAction(checkBlockedSitesFn)
   const bulkUpdate = useMutation(bulkUpdateFn)
+  const bulkMarkChecked = useMutation(bulkMarkCheckedFn)
   const bulkPrefix = useMutation(bulkPrefixFn)
   const updateWorkflow = useMutation(updateWorkflowFn)
   const dismissAlert = useMutation(dismissAlertFn)
@@ -1324,6 +1378,54 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
 
     setImportResult(totals)
     setImporting(false)
+  }
+
+  async function handleImportChecked(file: File) {
+    setImportingChecked(true)
+    setImportCheckedResult(null)
+
+    const buf = await file.arrayBuffer()
+    const wb = XLSX.read(buf, { type: 'array' })
+
+    // Any sheet with "domain" + "Note" columns is a reviewed alerts export (Note: DEAD/Ok).
+    // Other sheets (e.g. a separate Platforms/publisher list) are skipped automatically.
+    const domainToChecked = new Map<string, boolean>()
+    for (const sheetName of wb.SheetNames) {
+      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: null })
+      if (rows.length === 0) continue
+      const keys = Object.keys(rows[0])
+      const domainKey = keys.find(k => k.trim().toLowerCase() === 'domain')
+      const noteKey = keys.find(k => k.trim().toLowerCase() === 'note')
+      if (!domainKey || !noteKey) continue
+
+      for (const row of rows) {
+        const domain = String(row[domainKey] ?? '').trim().toLowerCase()
+        const note = String(row[noteKey] ?? '').trim().toLowerCase()
+        if (!domain || !note) continue
+        domainToChecked.set(domain, note === 'ok')
+      }
+    }
+
+    const updates = Array.from(domainToChecked, ([domain, checked]) => ({ domain, checked }))
+    if (updates.length === 0) {
+      setImportingChecked(false)
+      alert('No sheet with "domain" and "Note" columns found in this file')
+      return
+    }
+
+    const BATCH = 200
+    const totals = { checked: 0, unchecked: 0, notFound: 0 }
+    for (let i = 0; i < updates.length; i += BATCH) {
+      try {
+        const r = await bulkMarkChecked({ updates: updates.slice(i, i + BATCH) })
+        totals.checked   += r.checked
+        totals.unchecked += r.unchecked
+        totals.notFound  += r.notFound
+      } catch { /* continue */ }
+    }
+
+    setImportCheckedResult(totals)
+    setImportingChecked(false)
   }
 
   async function handlePrefixBulk() {
@@ -1698,6 +1800,9 @@ export function AlertsPage({ onViewSite: _onViewSite }: Props) {
             onSelect={a => { setSelectedAlert(a); setHighlightedId(a._id) }}
             onHighlight={setHighlightedId}
             onDismissAll={col.id === 'dead' ? handleDismissAllDead : undefined}
+            onImportChecked={col.id === 'dead' ? handleImportChecked : undefined}
+            importingChecked={importingChecked}
+            importCheckedResult={importCheckedResult}
             onScreenshot={setScreenshotDomain}
             onSelectGroup={(root, grpAlerts) => setSelectedGroup({ root, alerts: grpAlerts })}
             onDismissGroup={handleDismissGroup}

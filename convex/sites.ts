@@ -332,6 +332,7 @@ export const saveCheckResult = mutation({
         createdAt: Date.now(),
         dismissed: false,
         workflowStatus: isHttp0Dead ? 'dead' : severity === 'critical' ? 'urgent' : 'new',
+        checked: false,
         ...seoFields,
       })
       await adjustCounter(ctx, 'alerts_active', 1)
@@ -348,7 +349,7 @@ export const saveCheckResult = mutation({
     if (existingAlert) {
       const currentWf = existingAlert.workflowStatus ?? 'new'
       const wfPatch = isHttp0Dead && !['dead', 'done', 'ignored'].includes(currentWf)
-        ? { workflowStatus: 'dead' }
+        ? { workflowStatus: 'dead', checked: false }
         : severity === 'critical' && currentWf === 'new'
         ? { workflowStatus: 'urgent' }
         : {}
@@ -372,6 +373,7 @@ export const saveCheckResult = mutation({
       createdAt: Date.now(),
       dismissed: false,
       workflowStatus: isHttp0Dead ? 'dead' : severity === 'critical' ? 'urgent' : 'new',
+      checked: false,
       ...(effectiveBotBlocked ? { aiCategory: 'bot_blocked' } : {}),
       ...seoFields,
     })
@@ -1153,6 +1155,35 @@ export const bulkUpdateAlertsByDomain = mutation({
   },
 })
 
+export const bulkMarkAlertsChecked = mutation({
+  args: {
+    updates: v.array(v.object({ domain: v.string(), checked: v.boolean() })),
+  },
+  handler: async (ctx, { updates }) => {
+    let checked = 0, unchecked = 0, notFound = 0
+    for (const { domain, checked: isChecked } of updates) {
+      const site = await ctx.db.query('sites')
+        .withIndex('by_domain', q => q.eq('domain', domain.trim().toLowerCase()))
+        .first()
+      if (!site) { notFound++; continue }
+
+      const alert = await ctx.db.query('alerts')
+        .withIndex('by_site', q => q.eq('siteId', site._id))
+        .order('desc')
+        .filter(q => q.and(
+          q.eq(q.field('dismissed'), false),
+          q.eq(q.field('workflowStatus'), 'dead'),
+        ))
+        .first()
+      if (!alert) { notFound++; continue }
+
+      await ctx.db.patch(alert._id, { checked: isChecked })
+      if (isChecked) checked++; else unchecked++
+    }
+    return { checked, unchecked, notFound }
+  },
+})
+
 export const requeueSitesBatch = mutation({
   args: { siteIds: v.array(v.string()) },
   handler: async (ctx, { siteIds }) => {
@@ -1495,7 +1526,7 @@ export const migrateDeadAlertsPage = internalMutation({
         msg.includes('parking')
 
       if (deadByMessage) {
-        await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+        await ctx.db.patch(a._id, { workflowStatus: 'dead', checked: false })
         dead++
         continue
       }
@@ -1511,7 +1542,7 @@ export const migrateDeadAlertsPage = internalMutation({
       const titleLower = (site.pageTitle ?? '').toLowerCase()
       const deadByTitle = titleLower.length > 0 && SALE_TITLE_KEYWORDS.some(kw => titleLower.includes(kw))
       if (deadByTitle) {
-        await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+        await ctx.db.patch(a._id, { workflowStatus: 'dead', checked: false })
         dead++
         continue
       }
@@ -1521,7 +1552,7 @@ export const migrateDeadAlertsPage = internalMutation({
         try {
           const redirectHost = new URL(site.redirectUrl).hostname.replace(/^www\./, '')
           if (PARKING_HOSTS.some(h => redirectHost === h || redirectHost.endsWith('.' + h))) {
-            await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+            await ctx.db.patch(a._id, { workflowStatus: 'dead', checked: false })
             dead++
             continue
           }
@@ -1543,7 +1574,7 @@ export const migrateDeadAlertsPage = internalMutation({
         )
 
       if (deadBySite) {
-        await ctx.db.patch(a._id, { workflowStatus: 'dead' })
+        await ctx.db.patch(a._id, { workflowStatus: 'dead', checked: false })
         dead++
       }
     }
