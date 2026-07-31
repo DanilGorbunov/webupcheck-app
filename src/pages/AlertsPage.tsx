@@ -484,7 +484,7 @@ const DONE_COL_TABS = [
 ]
 
 const DEAD_COL_TABS = [
-  { key: 'unchecked', label: 'Dead (Minus Checked)' },
+  { key: 'unchecked', label: 'Dead - Checked' },
   { key: 'checked',   label: 'Checked' },
   { key: 'all_dead',  label: 'Dead' },
 ]
